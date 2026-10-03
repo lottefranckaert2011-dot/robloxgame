@@ -116,7 +116,10 @@ local function flickerLoop()
 	end
 end
 
+local updateKeys
+
 local function onRoomChanged()
+	updateKeys()
 	local room = roomModel()
 	local dark = room ~= nil and room:GetAttribute("Dark") == true
 	setDark(dark)
@@ -125,7 +128,7 @@ local function onRoomChanged()
 end
 
 -- Sleutels die je al hebt worden (alleen voor jou) onzichtbaar, in alle zalen
-local function updateKeys()
+function updateKeys()
 	local rooms = Workspace:FindFirstChild("Rooms")
 	if not rooms then
 		return
@@ -184,8 +187,11 @@ function Effects.Init(hud)
 		character:WaitForChild("Head")
 		onRoomChanged()
 	end)
-	-- De sleutels komen net na de zalen binnen
+	-- De sleutels komen net na de zalen binnen, en er kunnen later nieuwe kopieën van zalen bijkomen
 	task.delay(2, updateKeys)
+	Workspace.Rooms.ChildAdded:Connect(function()
+		task.delay(1, updateKeys)
+	end)
 
 	-- Kramen in de hal openen een venster
 	ProximityPromptService.PromptTriggered:Connect(function(prompt)

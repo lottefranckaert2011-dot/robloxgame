@@ -46,6 +46,7 @@ local notifyHolder: Frame
 local dangerFrames: { Frame } = {}
 local hiddenOverlay: Frame
 local bigBanner: TextLabel
+local resultsLabel: TextLabel
 local keyIcons: { [string]: Frame } = {}
 local cooldownOverlays: { [string]: Frame } = {}
 local lockIcons: { [string]: TextLabel } = {}
@@ -852,6 +853,19 @@ local function buildOverlays()
 		Parent = gui,
 	})
 
+	-- Wie zette de meeste boeken terug?
+	resultsLabel = outlined({
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.35, 50),
+		Size = UDim2.new(0.8, 0, 0, 40),
+		Font = SERIF,
+		TextSize = 30,
+		Text = "",
+		Visible = false,
+		ZIndex = 8,
+		Parent = gui,
+	})
+
 	notifyHolder = make("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 70),
@@ -1069,6 +1083,7 @@ local function updateRound()
 		countersHolder.Visible = false
 		leaveButton.Visible = false
 		bigBanner.Visible = false
+		resultsLabel.Visible = false
 		objectiveLabel.Text = "Kies een zaal!"
 		return
 	end
@@ -1081,6 +1096,7 @@ local function updateRound()
 	local placed = roomState:GetAttribute("Placed") or 0
 	local total = roomState:GetAttribute("Total") or 0
 	local message = roomState:GetAttribute("Message") or ""
+	local playerCount = roomState:GetAttribute("Players") or 1
 
 	timerLabel.Text = formatTime(timeLeft)
 	timerLabel.TextColor3 = if state == "Playing" and timeLeft <= 60 then Color3.fromRGB(255, 90, 90) else WHITE
@@ -1089,7 +1105,7 @@ local function updateRound()
 	if state == "Playing" then
 		local left = total - placed
 		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
-		objectiveLabel.Text = "Ruim alle kasten op"
+		objectiveLabel.Text = if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op"
 	elseif state == "Starting" then
 		sectionsLeftLabel.Text = "de zaal gaat zo open..."
 		objectiveLabel.Text = message
@@ -1102,8 +1118,12 @@ local function updateRound()
 		bigBanner.Visible = true
 		bigBanner.Text = message
 		bigBanner.TextColor3 = if state == "Won" then Color3.fromRGB(150, 255, 160) else Color3.fromRGB(255, 120, 120)
+		local results = roomState:GetAttribute("Results") or ""
+		resultsLabel.Text = results
+		resultsLabel.Visible = results ~= ""
 	else
 		bigBanner.Visible = false
+		resultsLabel.Visible = false
 	end
 end
 

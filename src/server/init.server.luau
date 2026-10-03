@@ -9,7 +9,6 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Config = require(ReplicatedStorage.Shared.Config)
 require(ReplicatedStorage.Shared.Remotes) -- maakt de RemoteEvents aan
 
-local LibraryBuilder = require(script.LibraryBuilder)
 local LobbyBuilder = require(script.LobbyBuilder)
 local KeyService = require(script.KeyService)
 local HideService = require(script.HideService)
@@ -53,21 +52,10 @@ StarterPlayer.EnableMouseLockOption = false -- Shift is voor sprinten
 
 local lobby = LobbyBuilder.Build(Workspace)
 
-local roomsFolder = Instance.new("Folder")
-roomsFolder.Name = "Rooms"
-roomsFolder.Parent = Workspace
-local libraries = {}
-local libraryList = {}
-for _, room in Config.Rooms do
-	local library = LibraryBuilder.Build(room, roomsFolder)
-	libraries[room.Id] = library
-	table.insert(libraryList, library)
-end
-
-KeyService.Init(libraryList)
-HideService.Init(libraryList)
+KeyService.Init()
+HideService.Init()
 DataService.Init()
-RoomService.Init(lobby, libraries)
+RoomService.Init(lobby) -- bouwt de zalen
 ShopService.Init()
 
 print(Config.GameName .. " is gestart!")

@@ -53,19 +53,19 @@ local function enter(player: Player, locker)
 	Remotes.Notify:FireClient(player, "Je zit verstopt. Houd je adem in...", Color3.fromRGB(180, 180, 255))
 end
 
-function HideService.Init(libraries: { any })
-	for _, library in libraries do
-		for _, locker in library.Lockers do
-			locker.Prompt.Triggered:Connect(function(player)
-				if hidingIn[player] == locker then
-					HideService.Exit(player)
-				elseif not hidingIn[player] then
-					enter(player, locker)
-				end
-			end)
-		end
+function HideService.AddLibrary(library)
+	for _, locker in library.Lockers do
+		locker.Prompt.Triggered:Connect(function(player)
+			if hidingIn[player] == locker then
+				HideService.Exit(player)
+			elseif not hidingIn[player] then
+				enter(player, locker)
+			end
+		end)
 	end
+end
 
+function HideService.Init()
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function()
 			-- Na respawnen zit je nergens meer in

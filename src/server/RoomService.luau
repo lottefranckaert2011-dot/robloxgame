@@ -1,37 +1,59 @@
--- Zalen: vanuit de hal kies je een deur. Elke zaal heeft zijn eigen ronde:
--- aftellen -> opruimen (met tijdslimiet en evt. monster) -> gewonnen/verloren -> terug naar de hal.
--- De status van elke zaal staat als attributen in ReplicatedStorage.RoomState.<Id>.
+-- Zalen en samen spelen.
+--
+-- In de hal staat voor elke soort zaal een deur met een ring. Stap met je vrienden in de ring:
+-- er begint een aftelling en wie bij nul in de ring staat, gaat samen naar binnen.
+-- Elke groep krijgt een eigen kopie van de zaal (tot Config.MaxCopiesPerRoom per soort),
+-- zodat meerdere groepen tegelijk kunnen spelen zonder elkaar in de weg te zitten.
+--
+-- Elke kopie heeft zijn eigen ronde: aftellen -> opruimen -> gewonnen/verloren -> terug naar de hal.
+-- De status staat als attributen in ReplicatedStorage.RoomState.<KopieId>.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local LibraryBuilder = require(script.Parent.LibraryBuilder)
 local BookService = require(script.Parent.BookService)
 local MonsterService = require(script.Parent.MonsterService)
 local DataService = require(script.Parent.DataService)
 local HideService = require(script.Parent.HideService)
+local KeyService = require(script.Parent.KeyService)
 
+-- Eén kopie van een zaal
 type Room = {
+	Id: string, -- bijv. "Classic_2"
 	Info: Config.RoomInfo,
 	Library: any,
 	Books: BookService.BookService,
 	Monster: MonsterService.Monster?,
 	State: Folder,
-	Door: any,
 	Players: { [Player]: boolean },
+	Contributions: { [Player]: number },
 	Status: string, -- Idle | Starting | Playing | Won | Lost
 	Finished: boolean,
 	RoundRunning: boolean,
 	TimeLeft: number,
 }
 
+-- Een soort zaal met zijn deur in de hal
+type RoomType = {
+	Info: Config.RoomInfo,
+	Door: any,
+	Copies: { Room },
+	QueueEnds: number?, -- wanneer de aftelling van de ring klaar is
+	Waiting: { Player }, -- wie er nu in de ring staat
+}
+
 local RoomService = {}
 
-local rooms: { [string]: Room } = {}
+local types: { [string]: RoomType } = {}
+local typeOrder: { RoomType } = {}
 local playerRoom: { [Player]: Room } = {}
-local touchCooldown: { [Player]: number } = {}
 local lobby
+local roomsFolder: Folder
+local stateFolder: Folder
 
 local function notify(player: Player, text: string, color: Color3?)
 	Remotes.Notify:FireClient(player, text, color)
@@ -51,24 +73,6 @@ end
 
 local function isEmpty(room: Room): boolean
 	return next(room.Players) == nil
-end
-
-local function updateDoor(room: Room)
-	local count = #roomPlayers(room)
-	local status = if room.Status == "Idle"
-		then "Vrij · stap in de ring!"
-		elseif room.Status == "Starting" then "Begint zo..."
-		elseif room.Status == "Playing" then "Bezig · " .. formatTime(room.TimeLeft)
-		else "Wordt opgeruimd..."
-	room.Door.Info.Text = string.format("👥 %d   %s", count, status)
-	room.State:SetAttribute("Players", count)
-end
-
-local function setState(room: Room, status: string, message: string)
-	room.Status = status
-	room.State:SetAttribute("RoundState", status)
-	room.State:SetAttribute("Message", message)
-	updateDoor(room)
 end
 
 local function getRoot(player: Player): BasePart?
@@ -93,6 +97,29 @@ local function sendEmptyInventory(player: Player)
 	Remotes.Inventory:FireClient(player, {}, player:GetAttribute("Capacity") or Config.BaseCapacity)
 end
 
+-- Tekst boven de deur: aftelling van de ring en hoeveel groepen er bezig zijn
+local function updateDoor(roomType: RoomType)
+	local busy, playing = 0, 0
+	for _, room in roomType.Copies do
+		if not isEmpty(room) then
+			busy += 1
+			playing += #roomPlayers(room)
+		end
+	end
+	local queue = if roomType.QueueEnds
+		then string.format("⏳ Start over %ds · %d/%d in de ring", math.max(0, math.ceil(roomType.QueueEnds - os.clock())), #roomType.Waiting, Config.MaxGroupSize)
+		else "Stap samen in de ring!"
+	local groups = if busy > 0 then string.format("   🎮 %d groep%s (%d spelers) bezig", busy, if busy == 1 then "" else "en", playing) else ""
+	roomType.Door.Info.Text = queue .. groups
+end
+
+local function setState(room: Room, status: string, message: string)
+	room.Status = status
+	room.State:SetAttribute("RoundState", status)
+	room.State:SetAttribute("Message", message)
+	room.State:SetAttribute("Players", #roomPlayers(room))
+end
+
 function RoomService.GetRoom(player: Player): Room?
 	return playerRoom[player]
 end
@@ -112,41 +139,57 @@ function RoomService.Leave(player: Player, toLobby: boolean)
 	room.Players[player] = nil
 	playerRoom[player] = nil
 	player:SetAttribute("Room", nil)
-	touchCooldown[player] = os.clock() + 3
+	room.State:SetAttribute("Players", #roomPlayers(room))
 	if toLobby then
 		teleport(player, lobby.SpawnCFrame)
 		sendEmptyInventory(player)
 	end
-	updateDoor(room)
 end
 
-local runRound
-
-function RoomService.Join(player: Player, roomId: string)
-	local room = rooms[roomId]
-	if not room or playerRoom[player] or not getRoot(player) then
-		return
-	end
-	if room.Status == "Won" or room.Status == "Lost" then
-		notify(player, room.Info.Name .. " wordt net opgeruimd. Probeer het zo nog eens!", Color3.fromRGB(255, 200, 120))
+local function join(player: Player, room: Room)
+	if playerRoom[player] or not getRoot(player) then
 		return
 	end
 	room.Players[player] = true
+	room.Contributions[player] = room.Contributions[player] or 0
 	playerRoom[player] = room
-	player:SetAttribute("Room", room.Info.Id)
+	player:SetAttribute("Room", room.Id)
 	DataService.SetRoundBooks(player, 0)
 	room.Books:AddPlayer(player)
 	teleport(player, room.Library.SpawnCFrame)
-	notify(player, "Welkom in de " .. room.Info.Name .. "!", room.Info.Color)
-	if not room.RoundRunning then
-		task.spawn(runRound, room)
+	room.State:SetAttribute("Players", #roomPlayers(room))
+end
+
+-- Uitslag: wie zette de meeste boeken terug?
+local function results(room: Room): string
+	local list = {}
+	for player, count in room.Contributions do
+		if player.Parent then
+			table.insert(list, { name = player.DisplayName, count = count })
+		end
 	end
-	updateDoor(room)
+	table.sort(list, function(a, b)
+		return a.count > b.count
+	end)
+	local parts = {}
+	local medals = { "🥇", "🥈", "🥉" }
+	for i, entry in list do
+		if i > 5 then
+			break
+		end
+		table.insert(parts, string.format("%s %s: %d", medals[i] or "•", entry.name, entry.count))
+	end
+	return table.concat(parts, "    ")
 end
 
 local function playRound(room: Room)
 	local info = room.Info
 	room.Finished = false
+	table.clear(room.Contributions)
+	for player in room.Players do
+		room.Contributions[player] = 0
+	end
+	room.State:SetAttribute("Results", "")
 	room.Books:Clear()
 
 	local aborted = false
@@ -157,16 +200,21 @@ local function playRound(room: Room)
 		end
 		room.TimeLeft = t
 		room.State:SetAttribute("TimeLeft", t)
-		setState(room, "Starting", "De zaal gaat open over " .. t .. "...")
+		setState(room, "Starting", "Klaar voor de start... " .. t)
 		task.wait(1)
 	end
 
 	local elapsed = 0
 	if not aborted then
 		room.Books:SpawnAll()
-		setState(room, "Playing", "Ruim alle kasten op!")
+		setState(room, "Playing", "Ruim samen alle kasten op!")
+		local count = #roomPlayers(room)
 		for _, player in roomPlayers(room) do
-			notify(player, "Zet alle boeken terug in de juiste kast!", Color3.fromRGB(255, 220, 150))
+			notify(
+				player,
+				if count > 1 then string.format("Jullie zijn met %d. Werk samen!", count) else "Zet alle boeken terug in de juiste kast!",
+				Color3.fromRGB(255, 220, 150)
+			)
 		end
 		local timeLeft = info.RoundTime
 		local monsterSpawned = false
@@ -177,7 +225,6 @@ local function playRound(room: Room)
 			end
 			room.TimeLeft = timeLeft
 			room.State:SetAttribute("TimeLeft", timeLeft)
-			updateDoor(room)
 			task.wait(1)
 			timeLeft -= 1
 			elapsed += 1
@@ -202,6 +249,7 @@ local function playRound(room: Room)
 		return
 	end
 
+	room.State:SetAttribute("Results", results(room))
 	if room.Finished then
 		setState(room, "Won", "DE ZAAL IS SCHOON! Tijd: " .. formatTime(elapsed))
 		local reward = math.floor(Config.CoinsForWin * info.CoinMultiplier)
@@ -225,41 +273,50 @@ local function playRound(room: Room)
 	end
 end
 
-function runRound(room: Room)
+local function runRound(room: Room)
 	room.RoundRunning = true
 	local ok, err = pcall(playRound, room)
 	if not ok then
-		warn("[Room " .. room.Info.Id .. "] " .. tostring(err))
+		warn("[Room " .. room.Id .. "] " .. tostring(err))
 	end
 	room.Books.Active = false
 	if room.Monster then
 		room.Monster.Despawn()
 	end
+	-- Wie er na een fout nog in zit, gaat terug naar de hal
+	for _, player in roomPlayers(room) do
+		RoomService.Leave(player, true)
+	end
 	room.Books:Clear()
 	room.RoundRunning = false
 	setState(room, "Idle", "")
-	-- Kwam er iemand binnen terwijl we aan het opruimen waren? Dan meteen opnieuw.
-	if not isEmpty(room) then
-		task.spawn(runRound, room)
-	end
 end
 
-local function createRoom(info: Config.RoomInfo, library, door, stateFolder: Folder): Room
+local function createCopy(roomType: RoomType): Room
+	local info = roomType.Info
+	local index = #roomType.Copies + 1
+	local id = info.Id .. "_" .. index
+	local offset = info.Offset + Config.CopySpacing * (index - 1)
+	local library = LibraryBuilder.Build(info, roomsFolder, offset, id)
+	KeyService.AddLibrary(library)
+	HideService.AddLibrary(library)
+
 	local state = Instance.new("Folder")
-	state.Name = info.Id
+	state.Name = id
 	state:SetAttribute("Name", info.Name)
 	state:SetAttribute("Dark", info.Dark)
 	state:SetAttribute("Total", Config.RoomTotalBooks(info))
 	state.Parent = stateFolder
 
 	local room: Room = {
+		Id = id,
 		Info = info,
 		Library = library,
 		Books = BookService.new(info, library, state),
 		Monster = nil,
 		State = state,
-		Door = door,
 		Players = {},
+		Contributions = {},
 		Status = "Idle",
 		Finished = false,
 		RoundRunning = false,
@@ -272,6 +329,7 @@ local function createRoom(info: Config.RoomInfo, library, door, stateFolder: Fol
 	room.Books.OnBookPlaced = function(player, count)
 		DataService.AddCoins(player, math.max(1, math.floor(count * Config.CoinsPerBook * info.CoinMultiplier + 0.5)))
 		DataService.SetRoundBooks(player, DataService.GetRoundBooks(player) + count)
+		room.Contributions[player] = (room.Contributions[player] or 0) + count
 	end
 
 	if info.Monster then
@@ -296,31 +354,145 @@ local function createRoom(info: Config.RoomInfo, library, door, stateFolder: Fol
 		end
 	end)
 
-	door.Prompt.Triggered:Connect(function(player)
-		RoomService.Join(player, info.Id)
-	end)
-	door.Zone.Touched:Connect(function(hit)
-		local character = hit.Parent
-		local player = character and Players:GetPlayerFromCharacter(character)
-		if player and not playerRoom[player] and os.clock() >= (touchCooldown[player] or 0) then
-			touchCooldown[player] = os.clock() + 2
-			RoomService.Join(player, info.Id)
-		end
-	end)
-
 	setState(room, "Idle", "")
+	table.insert(roomType.Copies, room)
 	return room
 end
 
-function RoomService.Init(lobbyData, libraries: { [string]: any })
+-- Een vrije kopie van deze zaal, of een nieuwe als het maximum nog niet bereikt is
+local function freeCopy(roomType: RoomType): Room?
+	for _, room in roomType.Copies do
+		if not room.RoundRunning and isEmpty(room) then
+			return room
+		end
+	end
+	if #roomType.Copies < Config.MaxCopiesPerRoom then
+		return createCopy(roomType)
+	end
+	return nil
+end
+
+-- Staat er een vriend van een van deze spelers al in een kopie met plek? Dan gaan ze daarheen.
+local function copyWithFriend(roomType: RoomType, group: { Player }): Room?
+	for _, room in roomType.Copies do
+		local space = Config.MaxGroupSize - #roomPlayers(room)
+		if (room.Status == "Starting" or room.Status == "Playing") and space >= #group then
+			for other in room.Players do
+				for _, player in group do
+					local ok, friends = pcall(player.IsFriendsWith, player, other.UserId)
+					if ok and friends then
+						return room
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function inZone(player: Player, zone: BasePart): boolean
+	local root = getRoot(player)
+	if not root then
+		return false
+	end
+	local offset = root.Position - zone.Position
+	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= zone.Size.X / 2 + 1 and math.abs(offset.Y) < zone.Size.Y
+end
+
+-- Iedereen die bij nul in de ring staat, gaat samen naar binnen
+local function launch(roomType: RoomType)
+	local group = {}
+	for _, player in roomType.Waiting do
+		if #group < Config.MaxGroupSize then
+			table.insert(group, player)
+		end
+	end
+	if #group == 0 then
+		return true
+	end
+	local room = copyWithFriend(roomType, group) or freeCopy(roomType)
+	if not room then
+		for _, player in group do
+			notify(player, "Alle " .. roomType.Info.Name .. "s zijn bezet. Nog even wachten...", Color3.fromRGB(255, 200, 120))
+		end
+		return false
+	end
+	for _, player in group do
+		join(player, room)
+	end
+	local names = {}
+	for _, player in group do
+		table.insert(names, player.DisplayName)
+	end
+	for _, player in group do
+		notify(player, "Welkom in de " .. roomType.Info.Name .. "! " .. (if #group > 1 then "Team: " .. table.concat(names, ", ") else ""), roomType.Info.Color)
+	end
+	if not room.RoundRunning then
+		task.spawn(runRound, room)
+	end
+	return true
+end
+
+local function queueLoop()
+	while true do
+		task.wait(0.25)
+		for _, roomType in typeOrder do
+			local waiting = {}
+			for _, player in Players:GetPlayers() do
+				if not playerRoom[player] and inZone(player, roomType.Door.Zone) then
+					table.insert(waiting, player)
+				end
+			end
+			roomType.Waiting = waiting
+			if #waiting == 0 then
+				roomType.QueueEnds = nil
+			elseif not roomType.QueueEnds then
+				roomType.QueueEnds = os.clock() + Config.QueueTime
+				for _, player in waiting do
+					notify(player, "Wacht even op je vrienden... iedereen in de ring gaat samen naar binnen!", roomType.Info.Color)
+				end
+			elseif os.clock() >= roomType.QueueEnds then
+				if launch(roomType) then
+					roomType.QueueEnds = nil
+				else
+					roomType.QueueEnds = os.clock() + 3
+				end
+			end
+			updateDoor(roomType)
+		end
+	end
+end
+
+function RoomService.Init(lobbyData)
 	lobby = lobbyData
-	local stateFolder = Instance.new("Folder")
+	roomsFolder = Instance.new("Folder")
+	roomsFolder.Name = "Rooms"
+	roomsFolder.Parent = Workspace
+	stateFolder = Instance.new("Folder")
 	stateFolder.Name = "RoomState"
 	stateFolder.Parent = ReplicatedStorage
 
 	for _, info in Config.Rooms do
-		rooms[info.Id] = createRoom(info, libraries[info.Id], lobby.Doors[info.Id], stateFolder)
+		local door = lobby.Doors[info.Id]
+		local roomType: RoomType = {
+			Info = info,
+			Door = door,
+			Copies = {},
+			QueueEnds = nil,
+			Waiting = {},
+		}
+		types[info.Id] = roomType
+		table.insert(typeOrder, roomType)
+		-- Eén kopie staat al klaar; extra kopieën worden gebouwd als ze nodig zijn
+		createCopy(roomType)
+		-- Op E drukken bij de deur zet je in de ring
+		door.Prompt.Triggered:Connect(function(player)
+			if not playerRoom[player] then
+				teleport(player, CFrame.new(door.Zone.Position))
+			end
+		end)
 	end
+	task.spawn(queueLoop)
 
 	Remotes.Action.OnServerEvent:Connect(function(player, action)
 		local room = playerRoom[player]
@@ -378,7 +550,6 @@ function RoomService.Init(lobbyData, libraries: { [string]: any })
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		RoomService.Leave(player, false)
-		touchCooldown[player] = nil
 	end)
 end
 

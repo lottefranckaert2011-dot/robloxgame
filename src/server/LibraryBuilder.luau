@@ -852,13 +852,14 @@ local function isInsideRect(pos: Vector3, x0: number, x1: number, z0: number, z1
 	return pos.X >= x0 and pos.X <= x1 and pos.Z >= z0 and pos.Z <= z1
 end
 
-function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance): Library
+-- Bouwt één kopie van een zaal. Van elke soort zaal kunnen er meerdere naast elkaar
+-- bestaan (elk op een eigen plek en met een eigen naam), zodat groepen apart spelen.
+function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: Vector3, name: string): Library
 	currentFloors = room.Floors
 	currentDark = room.Dark
-	local offset = room.Offset
 
 	local model = Instance.new("Model")
-	model.Name = room.Id
+	model.Name = name
 	model:SetAttribute("RoomId", room.Id)
 	model:SetAttribute("Dark", room.Dark)
 

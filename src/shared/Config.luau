@@ -37,7 +37,11 @@ local Config = {}
 Config.GameName = "Clean The Library 📖 [Nightmare]"
 
 -- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
-Config.StartCountdown = 10 -- seconden tussen binnenkomen en de start
+Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start
+Config.QueueTime = 10 -- zo lang telt de ring af voordat de groep naar binnen gaat
+Config.MaxGroupSize = 8 -- zoveel spelers kunnen samen in één zaal
+Config.MaxCopiesPerRoom = 4 -- zoveel groepen kunnen tegelijk dezelfde soort zaal spelen
+Config.CopySpacing = Vector3.new(0, 0, 400) -- afstand tussen kopieën van een zaal
 Config.EndScreenTime = 8 -- daarna ga je terug naar de hal
 Config.RespawnTime = 4
 

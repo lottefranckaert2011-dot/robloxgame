@@ -12,7 +12,21 @@ voordat de tijd op is. Maar **wees stil**: *De Bibliothecaresse* sluipt door de 
 2. Kies *File → Open from File…* en open `build/CleanTheLibraryNightmare.rbxlx`.
 3. Druk op **Play** (F5).
 
-Om met vrienden te spelen: *File → Publish to Roblox*.
+## Samen spelen
+
+- **In Studio testen met meerdere spelers:** ga naar het tabblad *Test*, kies bij *Clients and Servers* het aantal spelers
+  (bijvoorbeeld 2 of 3) en klik op *Start*. Je krijgt dan een venster per speler.
+- **Echt met vrienden spelen:** *File → Publish to Roblox*. Zet daarna in *Game Settings → Permissions* het spel op
+  *Public* (of nodig je vrienden uit) en kies bij *Places → Server Size* hoeveel spelers er op één server mogen (bijv. 20).
+
+Zo werkt samen spelen in het spel:
+
+- Stap met je vrienden in de **ring** voor een deur. Er begint een aftelling van 10 seconden;
+  iedereen die dan in de ring staat (max. 8), gaat **samen** naar binnen.
+- Elke groep krijgt een **eigen kopie** van de zaal, dus meerdere groepen kunnen tegelijk spelen
+  (tot 4 groepen per soort zaal).
+- Speelt een vriend van je al in een zaal? Dan kom je vanzelf bij hem of haar in de groep.
+- Jullie delen de boeken, de timer en het monster. Na de ronde zie je wie de meeste boeken terugzette.
 
 > Wil je dat munten en sleutels bewaard blijven? Zet dan in Studio *Game Settings → Security →
 > Enable Studio Access to API Services* aan (en publiceer het spel).
@@ -20,7 +34,7 @@ Om met vrienden te spelen: *File → Publish to Roblox*.
 ## De hal en de zalen
 
 Je begint in de **hal**: een grote ruimte met boogramen, een paars gewelf met een kroonluchter en een reuzenboek op de vloer.
-Achterin staan drie deuren met een gloeiende ring ervoor. Stap in een ring (of druk op **E** bij de deur) om naar die zaal te gaan.
+Achterin staan drie deuren met een gloeiende ring ervoor. Stap in een ring (of druk op **E** bij de deur) om mee te doen met de volgende groep voor die zaal.
 
 | Zaal | Wat je krijgt |
 | --- | --- |
@@ -28,8 +42,7 @@ Achterin staan drie deuren met een gloeiende ring ervoor. Stap in een ring (of d
 | 🔵 **Grote Zaal** | 2 verdiepingen, 31 kasten (248 boeken), 20 minuten, De Bibliothecaresse, 1,5× munten |
 | 🔴 **Nachtmerriezaal** | Pikdonker (je krijgt een zaklamp), een sneller monster, 2× munten |
 
-Boven elke deur zie je hoeveel spelers er binnen zijn en hoe lang hun ronde nog duurt.
-Een ronde begint 10 seconden nadat de eerste speler binnenkomt; wie later komt, helpt gewoon mee.
+Boven elke deur zie je de aftelling van de ring en hoeveel groepen er al bezig zijn.
 Na afloop (of via de voordeur van de zaal, of de knop **🚪 Terug naar de hal**) ga je terug naar de hal.
 In de hal staan ook kramen voor de **Winkel** en **Magie**.
 
