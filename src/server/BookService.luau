@@ -1,9 +1,8 @@
--- Boeken: verspreiden, oppakken, dragen, laten vallen en in de juiste kast zetten.
+-- Boeken in één zaal: verspreiden, oppakken, dragen, laten vallen en in de juiste kast zetten.
+-- Elke zaal krijgt zijn eigen BookService (BookService.new).
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -44,21 +43,6 @@ local BOOK_FONTS = {
 
 local BASE_SIZE = Vector3.new(1.4, 0.35, 1.9)
 local PAGES_COLOR = Color3.fromRGB(246, 236, 210)
-local CLUSTERS = 45
-
-local BookService = {}
-BookService.Library = nil :: any
-BookService.Placed = 0
-BookService.Active = false -- alleen tijdens een ronde kun je boeken pakken
--- Wordt door andere services ingevuld
-BookService.OnAllPlaced = nil :: (() -> ())?
-BookService.OnMistake = nil :: ((player: Player, position: Vector3) -> ())?
-BookService.OnBookPlaced = nil :: ((player: Player, count: number) -> ())?
-
-local folder: Folder
-local carried: { [Player]: { BookData } } = {}
-local placedPerSection: { [string]: number } = {}
-local bookData: { [BasePart]: BookData } = {}
 local nextId = 0
 
 local function playSound(id: string, parent: Instance)
@@ -92,15 +76,6 @@ local function getRoot(player: Player): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function sendInventory(player: Player)
-	local list = {}
-	local books: { BookData } = carried[player] or {}
-	for _, book in books do
-		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color })
-	end
-	Remotes.Inventory:FireClient(player, list, getCapacity(player))
-end
-
 -- Maakt de onderdelen van een boek: kaft + bladzijden die aan drie kanten uitsteken.
 local function buildBookParts(book: BookData, scale: number): BasePart
 	local size = BASE_SIZE * scale
@@ -131,7 +106,7 @@ local function buildBookParts(book: BookData, scale: number): BasePart
 	weld.Parent = pages
 	pages.Parent = cover
 
-	-- Voorkant: titel + code
+	-- Voorkant: titel tussen twee gouden banden
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Top
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
@@ -187,7 +162,7 @@ local function moveBook(cover: BasePart, cf: CFrame)
 end
 
 -- Stapel boeken die je zichtbaar voor je uit draagt
-local function updateCarryVisual(player: Player)
+local function updateCarryVisual(player: Player, books: { BookData })
 	local character = player.Character
 	if not character then
 		return
@@ -197,11 +172,7 @@ local function updateCarryVisual(player: Player)
 	if old then
 		old:Destroy()
 	end
-	if not root then
-		return
-	end
-	local books = carried[player] or {}
-	if #books == 0 then
+	if not root or #books == 0 then
 		return
 	end
 	local model = Instance.new("Model")
@@ -229,13 +200,79 @@ local function updateCarryVisual(player: Player)
 	model.Parent = character
 end
 
-local function changed(player: Player)
-	updateCarryVisual(player)
-	sendInventory(player)
+local BookService = {}
+BookService.__index = BookService
+
+export type BookService = typeof(setmetatable(
+	{} :: {
+		Room: Config.RoomInfo,
+		Library: any,
+		State: Instance,
+		Folder: Folder,
+		Total: number,
+		Placed: number,
+		Active: boolean,
+		Carried: { [Player]: { BookData } },
+		PlacedPerSection: { [string]: number },
+		BookData: { [BasePart]: BookData },
+		OnAllPlaced: (() -> ())?,
+		OnMistake: ((player: Player, position: Vector3) -> ())?,
+		OnBookPlaced: ((player: Player, count: number) -> ())?,
+	},
+	BookService
+))
+
+function BookService.new(room: Config.RoomInfo, library, state: Instance): BookService
+	local self = setmetatable({
+		Room = room,
+		Library = library,
+		State = state,
+		Folder = library.Books,
+		Total = Config.RoomTotalBooks(room),
+		Placed = 0,
+		Active = false, -- alleen tijdens een ronde kun je boeken pakken
+		Carried = {},
+		PlacedPerSection = {},
+		BookData = {},
+		OnAllPlaced = nil,
+		OnMistake = nil,
+		OnBookPlaced = nil,
+	}, BookService)
+
+	for code, section in library.Sections do
+		for _, prompt in section.Prompts do
+			prompt.Triggered:Connect(function(player)
+				self:Place(player, code)
+			end)
+		end
+	end
+	self:Clear()
+	return self
+end
+
+function BookService.AddPlayer(self: BookService, player: Player)
+	self.Carried[player] = self.Carried[player] or {}
+	self:Changed(player)
+end
+
+function BookService.RemovePlayer(self: BookService, player: Player)
+	self:Scatter(player)
+	self.Carried[player] = nil
+	updateCarryVisual(player, {})
+end
+
+function BookService.Changed(self: BookService, player: Player)
+	local books = self.Carried[player] or {}
+	updateCarryVisual(player, books)
+	local list = {}
+	for _, book in books do
+		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color })
+	end
+	Remotes.Inventory:FireClient(player, list, getCapacity(player))
 end
 
 -- `surface` is de plek op de vloer/tafel; het boek gaat erbovenop liggen
-local function makeLooseBook(book: BookData, surface: CFrame)
+function BookService.MakeLooseBook(self: BookService, book: BookData, surface: CFrame)
 	local p = buildBookParts(book, book.Scale)
 	local cf = surface * CFrame.new(0, p.Size.Y / 2, 0)
 	-- Af en toe ligt een boek scheef tegen iets aan
@@ -257,26 +294,26 @@ local function makeLooseBook(book: BookData, surface: CFrame)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = p
 	prompt.Triggered:Connect(function(player)
-		BookService.PickUp(player, p)
+		self:PickUp(player, p)
 	end)
 
-	bookData[p] = book
+	self.BookData[p] = book
 	p.Destroying:Connect(function()
-		bookData[p] = nil
+		self.BookData[p] = nil
 	end)
-	p.Parent = folder
+	p.Parent = self.Folder
 	return p
 end
 
-function BookService.PickUp(player: Player, bookPart: BasePart, silent: boolean?): boolean
-	if not BookService.Active or bookPart.Parent ~= folder or bookPart:GetAttribute("Flying") then
+function BookService.PickUp(self: BookService, player: Player, bookPart: BasePart, silent: boolean?): boolean
+	if not self.Active or bookPart.Parent ~= self.Folder or bookPart:GetAttribute("Flying") then
 		return false
 	end
 	if player:GetAttribute("Hidden") then
 		return false
 	end
-	local list = carried[player]
-	local book = bookData[bookPart]
+	local list = self.Carried[player]
+	local book = self.BookData[bookPart]
 	if not list or not book then
 		return false
 	end
@@ -292,82 +329,80 @@ function BookService.PickUp(player: Player, bookPart: BasePart, silent: boolean?
 	end
 	bookPart:Destroy()
 	if not silent then
-		changed(player)
+		self:Changed(player)
 	end
 	return true
 end
 
-local function updateSign(section)
-	local count = placedPerSection[section.Code] or 0
-	local done = count >= Config.BooksPerSection
+function BookService.UpdateSign(self: BookService, section)
+	local count = self.PlacedPerSection[section.Code] or 0
+	local perSection = self.Room.BooksPerSection
+	local done = count >= perSection
 	for _, label in section.Counters do
-		label.Text = if done
-			then "✔ " .. section.Name
-			else string.format("%s · %d/%d", section.Name, count, Config.BooksPerSection)
+		label.Text = if done then "✔ " .. section.Name else string.format("%s · %d/%d", section.Name, count, perSection)
 		label.TextColor3 = if done then Color3.fromRGB(150, 255, 160) else Color3.fromRGB(230, 220, 190)
 	end
 end
 
 -- Zet één boek op de volgende lege plek in de kast
-local function fillSlot(section, book: BookData)
-	local count = (placedPerSection[section.Code] or 0) + 1
+function BookService.FillSlot(self: BookService, section, book: BookData)
+	local count = (self.PlacedPerSection[section.Code] or 0) + 1
 	local slot = section.Slots[count]
 	if slot then
 		slot.Transparency = 0
 		slot.Material = Enum.Material.SmoothPlastic
 		slot.Color = book.Color
 	end
-	placedPerSection[section.Code] = count
-	BookService.Placed += 1
+	self.PlacedPerSection[section.Code] = count
+	self.Placed += 1
 end
 
 -- Na het terugzetten: teller, melding, beloning, en kijken of alles klaar is
-local function afterPlaced(player: Player, section, placedNow: number, quiet: boolean?)
-	Workspace:SetAttribute("Placed", BookService.Placed)
-	updateSign(section)
-	if BookService.OnBookPlaced then
-		BookService.OnBookPlaced(player, placedNow)
+function BookService.AfterPlaced(self: BookService, player: Player, section, placedNow: number, quiet: boolean?)
+	self.State:SetAttribute("Placed", self.Placed)
+	self:UpdateSign(section)
+	if self.OnBookPlaced then
+		self.OnBookPlaced(player, placedNow)
 	end
-	if (placedPerSection[section.Code] or 0) >= Config.BooksPerSection then
-		Remotes.Notify:FireAllClients(
-			string.format("Sectie %s %s is compleet!", section.Code, section.Name),
-			Color3.fromRGB(150, 255, 160)
-		)
+	if (self.PlacedPerSection[section.Code] or 0) >= self.Room.BooksPerSection then
+		for other in self.Carried do
+			notify(other, string.format("Sectie %s %s is compleet!", section.Code, section.Name), Color3.fromRGB(150, 255, 160))
+		end
 	elseif not quiet then
 		notify(player, string.format("+%d boek%s in %s", placedNow, if placedNow == 1 then "" else "en", section.Name), Color3.fromRGB(120, 255, 140))
 	end
-	if BookService.Placed >= Config.TotalBooks() and BookService.OnAllPlaced then
-		BookService.OnAllPlaced()
+	if self.Placed >= self.Total and self.OnAllPlaced then
+		self.OnAllPlaced()
 	end
 end
 
 -- Zet alle gedragen boeken met deze code in de kast. Geeft het aantal terug.
-local function placeMatching(player: Player, code: string, quiet: boolean?): number
-	local list = carried[player]
-	local section = BookService.Library.Sections[code]
+function BookService.PlaceMatching(self: BookService, player: Player, code: string, quiet: boolean?): number
+	local list = self.Carried[player]
+	local section = self.Library.Sections[code]
 	if not list or not section then
 		return 0
 	end
 	local placedNow = 0
 	for i = #list, 1, -1 do
 		if list[i].Code == code then
-			fillSlot(section, list[i])
+			self:FillSlot(section, list[i])
 			table.remove(list, i)
 			placedNow += 1
 		end
 	end
 	if placedNow > 0 then
-		afterPlaced(player, section, placedNow, quiet)
+		self:AfterPlaced(player, section, placedNow, quiet)
 	end
 	return placedNow
 end
 
-function BookService.Place(player: Player, code: string)
-	if not BookService.Active then
+function BookService.Place(self: BookService, player: Player, code: string)
+	if not self.Active then
 		return
 	end
-	local list = carried[player]
-	local section = BookService.Library.Sections[code]
+	local list = self.Carried[player]
+	local section = self.Library.Sections[code]
 	if not list or not section then
 		return
 	end
@@ -377,14 +412,14 @@ function BookService.Place(player: Player, code: string)
 	end
 
 	local character = player.Character
-	local placedNow = placeMatching(player, code)
+	local placedNow = self:PlaceMatching(player, code)
 	if placedNow == 0 then
 		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
 			playSound(Config.SoundIds.Wrong, character)
 			local root = getRoot(player)
-			if root and BookService.OnMistake then
-				BookService.OnMistake(player, root.Position)
+			if root and self.OnMistake then
+				self.OnMistake(player, root.Position)
 			end
 		end
 		return
@@ -392,18 +427,18 @@ function BookService.Place(player: Player, code: string)
 	if character then
 		playSound(Config.SoundIds.Place, character)
 	end
-	changed(player)
+	self:Changed(player)
 end
 
 -- Magie "Verzamelen": pak de dichtstbijzijnde boeken op
-function BookService.Assemble(player: Player, radius: number): number
+function BookService.Assemble(self: BookService, player: Player, radius: number): number
 	local root = getRoot(player)
-	local list = carried[player]
-	if not BookService.Active or not root or not list then
+	local list = self.Carried[player]
+	if not self.Active or not root or not list then
 		return 0
 	end
 	local nearby = {}
-	for _, p in folder:GetChildren() do
+	for _, p in self.Folder:GetChildren() do
 		if p:IsA("BasePart") and not p:GetAttribute("Flying") then
 			local d = (p.Position - root.Position).Magnitude
 			if d <= radius then
@@ -419,21 +454,21 @@ function BookService.Assemble(player: Player, radius: number): number
 		if #list >= getCapacity(player) then
 			break
 		end
-		if BookService.PickUp(player, entry.part, true) then
+		if self:PickUp(player, entry.part, true) then
 			got += 1
 		end
 	end
 	if got > 0 then
 		playSound(Config.SoundIds.Pickup, root)
-		changed(player)
+		self:Changed(player)
 	end
 	return got
 end
 
 -- Magie "Auto-plaatsen": alle gedragen boeken naar de goede kast
-function BookService.AutoShelf(player: Player): number
-	local list = carried[player]
-	if not BookService.Active or not list or #list == 0 then
+function BookService.AutoShelf(self: BookService, player: Player): number
+	local list = self.Carried[player]
+	if not self.Active or not list or #list == 0 then
 		return 0
 	end
 	local codes = {}
@@ -442,26 +477,26 @@ function BookService.AutoShelf(player: Player): number
 	end
 	local total = 0
 	for code in codes do
-		total += placeMatching(player, code, true)
+		total += self:PlaceMatching(player, code, true)
 	end
 	if total > 0 then
 		local root = getRoot(player)
 		if root then
 			playSound(Config.SoundIds.Place, root)
 		end
-		changed(player)
+		self:Changed(player)
 	end
 	return total
 end
 
 -- De assistent laat een willekeurig boek naar de goede kast vliegen
-function BookService.AssistantPlace(player: Player): boolean
-	if not BookService.Active then
+function BookService.AssistantPlace(self: BookService, player: Player): boolean
+	if not self.Active then
 		return false
 	end
 	local candidates = {}
-	for _, p in folder:GetChildren() do
-		if p:IsA("BasePart") and not p:GetAttribute("Flying") and bookData[p] then
+	for _, p in self.Folder:GetChildren() do
+		if p:IsA("BasePart") and not p:GetAttribute("Flying") and self.BookData[p] then
 			table.insert(candidates, p)
 		end
 	end
@@ -469,8 +504,8 @@ function BookService.AssistantPlace(player: Player): boolean
 		return false
 	end
 	local p = candidates[math.random(1, #candidates)] :: BasePart
-	local book = bookData[p]
-	local section = BookService.Library.Sections[book.Code]
+	local book = self.BookData[p]
+	local section = self.Library.Sections[book.Code]
 	if not section then
 		return false
 	end
@@ -499,78 +534,76 @@ function BookService.AssistantPlace(player: Player): boolean
 	)
 	tween2:Play()
 	tween2.Completed:Wait()
-	if not p.Parent or not BookService.Active then
+	if not p.Parent or not self.Active then
 		return false
 	end
 	p:Destroy()
-	fillSlot(section, book)
-	afterPlaced(player, section, 1, true)
+	self:FillSlot(section, book)
+	self:AfterPlaced(player, section, 1, true)
 	return true
 end
 
--- Zoek een plek op de grond vlak bij een positie
-local function groundNear(position: Vector3): CFrame
-	return BookService.Library:BookSpotNear(position, 3, folder) or BookService.Library:RandomBookSpot()
-end
-
-function BookService.Drop(player: Player)
-	local list = carried[player]
+function BookService.Drop(self: BookService, player: Player)
+	local list = self.Carried[player]
 	if not list or #list == 0 then
 		return
 	end
 	local root = getRoot(player)
 	for _, book in list do
-		makeLooseBook(book, if root then groundNear(root.Position) else BookService.Library:RandomBookSpot())
+		local spot = root and self.Library:BookSpotNear(root.Position, 3, self.Folder)
+		self:MakeLooseBook(book, spot or self.Library:RandomBookSpot())
 	end
 	table.clear(list)
-	changed(player)
+	self:Changed(player)
 end
 
--- Als het monster je pakt, vliegen je boeken terug door de hele bibliotheek
-function BookService.Scatter(player: Player)
-	local list = carried[player]
+-- Als het monster je pakt, vliegen je boeken terug door de hele zaal
+function BookService.Scatter(self: BookService, player: Player)
+	local list = self.Carried[player]
 	if not list or #list == 0 then
 		return
 	end
-	if BookService.Active then
+	if self.Active then
 		for _, book in list do
-			makeLooseBook(book, BookService.Library:RandomBookSpot())
+			self:MakeLooseBook(book, self.Library:RandomBookSpot())
 		end
 	end
 	table.clear(list)
-	changed(player)
+	self:Changed(player)
 end
 
-function BookService.Clear()
-	BookService.Active = false
-	folder:ClearAllChildren()
-	for player, list in carried do
+function BookService.Clear(self: BookService)
+	self.Active = false
+	self.Folder:ClearAllChildren()
+	for player, list in self.Carried do
 		table.clear(list)
-		changed(player)
+		self:Changed(player)
 	end
-	table.clear(placedPerSection)
-	BookService.Placed = 0
-	Workspace:SetAttribute("Placed", 0)
-	Workspace:SetAttribute("Total", Config.TotalBooks())
-	for _, section in BookService.Library.Sections do
+	table.clear(self.PlacedPerSection)
+	self.Placed = 0
+	self.State:SetAttribute("Placed", 0)
+	self.State:SetAttribute("Total", self.Total)
+	for _, section in self.Library.Sections do
 		for _, slot in section.Slots do
 			slot.Transparency = 0.75
 			slot.Material = Enum.Material.Glass
 			slot.Color = Color3.fromRGB(255, 245, 225)
 		end
-		updateSign(section)
+		self:UpdateSign(section)
 	end
 end
 
-function BookService.SpawnAll()
-	local library = BookService.Library
-	-- Boeken liggen in rommelige stapels verspreid door de bibliotheek
+function BookService.SpawnAll(self: BookService)
+	local library = self.Library
+	-- Boeken liggen in rommelige stapels verspreid door de zaal
 	local clusters = {}
-	for i = 1, CLUSTERS do
+	local clusterCount = math.max(12, math.floor(self.Total / 5.5))
+	for i = 1, clusterCount do
 		clusters[i] = library:RandomBookSpot().Position
 	end
-	for _, section in Config.Sections do
-		for i = 1, Config.BooksPerSection do
+	for _, entry in Config.RoomSections(self.Room) do
+		local section = entry.Section
+		for i = 1, self.Room.BooksPerSection do
 			nextId += 1
 			local title = section.Titles[(i - 1) % #section.Titles + 1]
 			if i > #section.Titles then
@@ -586,56 +619,11 @@ function BookService.SpawnAll()
 				Font = BOOK_FONTS[math.random(1, #BOOK_FONTS)],
 			}
 			local center = clusters[math.random(1, #clusters)]
-			local spot = library:BookSpotNear(center, 7, folder) or library:RandomBookSpot()
-			makeLooseBook(book, spot)
+			local spot = library:BookSpotNear(center, 7, self.Folder) or library:RandomBookSpot()
+			self:MakeLooseBook(book, spot)
 		end
 	end
-	BookService.Active = true
-end
-
-function BookService.Init(library)
-	BookService.Library = library
-	folder = Instance.new("Folder")
-	folder.Name = "Books"
-	folder.Parent = Workspace
-
-	for code, section in library.Sections do
-		for _, prompt in section.Prompts do
-			prompt.Triggered:Connect(function(player)
-				BookService.Place(player, code)
-			end)
-		end
-	end
-
-	local function onPlayer(player: Player)
-		carried[player] = {}
-		player.CharacterAdded:Connect(function(character)
-			local humanoid = character:WaitForChild("Humanoid") :: Humanoid
-			humanoid.Died:Connect(function()
-				BookService.Scatter(player)
-			end)
-			task.defer(changed, player)
-		end)
-		player:GetAttributeChangedSignal("Capacity"):Connect(function()
-			sendInventory(player)
-		end)
-	end
-	Players.PlayerAdded:Connect(onPlayer)
-	for _, player in Players:GetPlayers() do
-		onPlayer(player)
-	end
-	Players.PlayerRemoving:Connect(function(player)
-		BookService.Scatter(player)
-		carried[player] = nil
-	end)
-
-	Remotes.Action.OnServerEvent:Connect(function(player, action)
-		if action == "Drop" then
-			BookService.Drop(player)
-		end
-	end)
-
-	BookService.Clear()
+	self.Active = true
 end
 
 return BookService

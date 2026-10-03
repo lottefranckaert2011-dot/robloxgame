@@ -12,6 +12,14 @@ local F2 = Map.FloorHeight
 
 local LibraryBuilder = {}
 
+-- Instellingen van de zaal die nu gebouwd wordt
+local currentFloors = 2
+local currentDark = false
+
+local function levels(): { number }
+	return if currentFloors >= 2 then { 0, F2 } else { 0 }
+end
+
 export type SectionData = {
 	Code: string,
 	Name: string,
@@ -35,7 +43,10 @@ export type LockerData = {
 
 export type Library = {
 	Model: Model,
+	Books: Folder,
+	Offset: Vector3,
 	SpawnCFrame: CFrame,
+	ExitPrompt: ProximityPrompt,
 	Sections: { [string]: SectionData },
 	Lockers: { LockerData },
 	Waypoints: { Vector3 },
@@ -162,6 +173,9 @@ local function buildFloors(folder: Folder)
 		Parent = folder,
 	})
 	bookSurface(floor1)
+	if currentFloors < 2 then
+		return
+	end
 
 	-- Eerste verdieping met een gat voor de oprit (x 100..112, z 24..72):
 	-- bovenkant hout, onderkant gestuukt plafond
@@ -260,9 +274,9 @@ local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward
 	end
 
 	-- Lijsten: plint onderaan en een rode lijst onder elk plafond
-	for _, y0 in { 0, F2 } do
+	for _, y0 in levels() do
 		deco({ Name = "Baseboard", Size = Vector3.new(length, 1, 0.4), CFrame = at(0, y0 + 0.5, 0.2), Color = DARK_WOOD, Parent = folder })
-		local top = if y0 == 0 then F2 - 2 else Map.WallHeight
+		local top = if y0 == 0 and currentFloors >= 2 then F2 - 2 else Map.WallHeight
 		deco({ Name = "Moulding", Size = Vector3.new(length, 1.4, 1), CFrame = at(0, top - 0.7, 0.5), Color = MOULDING, Material = Enum.Material.Wood, Parent = folder })
 		deco({ Name = "MouldingTrim", Size = Vector3.new(length, 0.3, 1.3), CFrame = at(0, top - 1.55, 0.65), Color = PILLAR, Material = Enum.Material.Wood, Parent = folder })
 	end
@@ -280,7 +294,7 @@ local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward
 			Parent = folder,
 		})
 		-- Wandlamp op de pilaar (beide verdiepingen)
-		for _, y0 in { 0, F2 } do
+		for _, y0 in levels() do
 			deco({ Name = "SconceBase", Size = Vector3.new(0.7, 1.4, 0.5), CFrame = at(t, y0 + 9, 1.45), Color = GOLD, Material = Enum.Material.Metal, Parent = folder })
 			local bulb = deco({
 				Name = "SconceBulb",
@@ -291,18 +305,25 @@ local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward
 				Material = Enum.Material.Neon,
 				Parent = folder,
 			})
-			if i % 2 == 0 then
+			-- In een donkere zaal branden er minder lampen en die flikkeren
+			if (currentDark and i % 4 == 0) or (not currentDark and i % 2 == 0) then
 				local light = Instance.new("PointLight")
 				light.Color = LAMP_LIGHT
 				light.Range = 18
-				light.Brightness = 1.4
+				light.Brightness = if currentDark then 0.9 else 1.4
 				light.Parent = bulb
+				if currentDark then
+					bulb:SetAttribute("Flicker", true)
+				end
+			elseif currentDark then
+				bulb.Material = Enum.Material.SmoothPlastic
+				bulb.Color = Color3.fromRGB(90, 80, 70)
 			end
 		end
 		-- Boogpaneel tussen deze en de volgende pilaar
 		if i < count - 1 then
 			local bt = t + pillarStep / 2
-			for _, y0 in { 0, F2 } do
+			for _, y0 in levels() do
 				local bayCenter = origin + along * bt + Vector3.new(0, y0, 0)
 				if not (skipBay and skipBay(bayCenter, y0)) then
 					local width = math.min(12, pillarStep - 6)
@@ -543,7 +564,7 @@ local function buildCabinet(parent: Model, cf: CFrame)
 	}))
 end
 
-local function buildSection(parent: Folder, section: Config.Section, index: number, slot: number): SectionData
+local function buildSection(parent: Folder, section: Config.Section, index: number, slot: number, booksPerSection: number): SectionData
 	local col = (slot - 1) % #Map.GridX + 1
 	local row = math.floor((slot - 1) / #Map.GridX) + 1
 	local floorY = if section.Floor == 1 then 0 else F2
@@ -584,7 +605,7 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 
 	-- Lege plekken die opvullen als je boeken terugzet
 	local slots = {}
-	local n = Config.BooksPerSection
+	local n = booksPerSection
 	local levels = { 0.3, 3.05, 5.8 }
 	local perLevel = math.ceil(n / #levels)
 	local spacing = (Map.CaseLength - 4) / perLevel
@@ -797,10 +818,14 @@ end
 
 local function buildLamps(parent: Folder)
 	-- Hangende kroonluchters op de begane grond
+	local ceiling = if currentFloors >= 2 then F2 - 2 else Map.WallHeight
+	local index = 0
 	for x = -100, 100, 50 do
 		for z = -60, 60, 40 do
-			local y = F2 - 4.5
-			deco({ Name = "Chain", Size = Vector3.new(0.15, 2.5, 0.15), Position = Vector3.new(x, y + 1.9, z), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
+			index += 1
+			local y = if currentFloors >= 2 then F2 - 4.5 else 30
+			local chain = ceiling - (y + 0.6)
+			deco({ Name = "Chain", Size = Vector3.new(0.15, chain, 0.15), Position = Vector3.new(x, y + 0.6 + chain / 2, z), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
 			deco({ Name = "Crown", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 3, 3), CFrame = CFrame.new(x, y + 0.6, z) * CFrame.Angles(0, 0, math.rad(90)), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
 			local lamp = deco({
 				Name = "Lamp",
@@ -814,8 +839,11 @@ local function buildLamps(parent: Folder)
 			local light = Instance.new("PointLight")
 			light.Color = LAMP_LIGHT
 			light.Range = 30
-			light.Brightness = 1.2
+			light.Brightness = if currentDark then 0.7 else 1.2
 			light.Parent = lamp
+			if currentDark and index % 3 == 0 then
+				lamp:SetAttribute("Flicker", true)
+			end
 		end
 	end
 end
@@ -824,16 +852,26 @@ local function isInsideRect(pos: Vector3, x0: number, x1: number, z0: number, z1
 	return pos.X >= x0 and pos.X <= x1 and pos.Z >= z0 and pos.Z <= z1
 end
 
-function LibraryBuilder.Build(): Library
-	local old = Workspace:FindFirstChild("Library")
-	if old then
-		old:Destroy()
-	end
+function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance): Library
+	currentFloors = room.Floors
+	currentDark = room.Dark
+	local offset = room.Offset
 
 	local model = Instance.new("Model")
-	model.Name = "Library"
+	model.Name = room.Id
+	model:SetAttribute("RoomId", room.Id)
+	model:SetAttribute("Dark", room.Dark)
 
 	buildStructure(model)
+
+	-- Deur terug naar de hal
+	local exitPrompt = Instance.new("ProximityPrompt")
+	exitPrompt.ActionText = "Terug naar de hal"
+	exitPrompt.ObjectText = "Deur"
+	exitPrompt.HoldDuration = 0.5
+	exitPrompt.MaxActivationDistance = 12
+	exitPrompt.RequiresLineOfSight = false
+	exitPrompt.Parent = model:FindFirstChild("FrontDoor", true)
 
 	local sectionsFolder = Instance.new("Folder")
 	sectionsFolder.Name = "Sections"
@@ -841,9 +879,10 @@ function LibraryBuilder.Build(): Library
 
 	local sections: { [string]: SectionData } = {}
 	local usedSlots = { [1] = 0, [2] = 0 }
-	for index, section in Config.Sections do
+	for _, entry in Config.RoomSections(room) do
+		local section = entry.Section
 		usedSlots[section.Floor] += 1
-		sections[section.Code] = buildSection(sectionsFolder, section, index, usedSlots[section.Floor])
+		sections[section.Code] = buildSection(sectionsFolder, section, entry.Index, usedSlots[section.Floor], room.BooksPerSection)
 	end
 
 	-- Leestafels op de overgebleven plekken in het rooster
@@ -851,7 +890,7 @@ function LibraryBuilder.Build(): Library
 	furniture.Name = "Furniture"
 	furniture.Parent = model
 	local slotCount = #Map.GridX * #Map.GridZ
-	for floor = 1, 2 do
+	for floor = 1, room.Floors do
 		for slot = usedSlots[floor] + 1, slotCount do
 			local col = (slot - 1) % #Map.GridX + 1
 			local row = math.floor((slot - 1) / #Map.GridX) + 1
@@ -862,8 +901,10 @@ function LibraryBuilder.Build(): Library
 	-- Extra tafels in de hal bij de ingang
 	buildTable(furniture, Vector3.new(-60, 0, 62))
 	buildTable(furniture, Vector3.new(60, 0, 62))
-	buildTable(furniture, Vector3.new(-60, F2, 62))
-	buildTable(furniture, Vector3.new(40, F2, 62))
+	if room.Floors >= 2 then
+		buildTable(furniture, Vector3.new(-60, F2, 62))
+		buildTable(furniture, Vector3.new(40, F2, 62))
+	end
 
 	-- Planten
 	local plantSpots = {
@@ -883,7 +924,9 @@ function LibraryBuilder.Build(): Library
 		Vector3.new(60, 0, -77),
 	}
 	for _, spot in plantSpots do
-		buildPlant(furniture, spot)
+		if spot.Y < 1 or room.Floors >= 2 then
+			buildPlant(furniture, spot)
+		end
 	end
 
 	local lamps = Instance.new("Folder")
@@ -906,24 +949,21 @@ function LibraryBuilder.Build(): Library
 		{ Vector3.new(80, F2, 77), Vector3.new(0, 0, -1) },
 	}
 	for _, spot in lockerSpots do
-		table.insert(lockers, buildLocker(lockersFolder, spot[1], spot[2]))
+		if spot[1].Y < 1 or room.Floors >= 2 then
+			local locker = buildLocker(lockersFolder, spot[1], spot[2])
+			locker.Inside += offset
+			locker.Outside += offset
+			table.insert(lockers, locker)
+		end
 	end
 
-	-- Spawnplek achter de balie (onzichtbaar, op het kleed)
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "Spawn"
-	spawn.Anchored = true
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.Size = Vector3.new(10, 1, 6)
-	spawn.Position = Vector3.new(0, -0.45, 68)
-	spawn.Transparency = 1
-	spawn.CanQuery = false
-	spawn.Parent = model
+	local books = Instance.new("Folder")
+	books.Name = "Books"
+	books.Parent = model
 
 	-- Patrouillepunten voor het monster (in de gangpaden, beide verdiepingen)
 	local waypoints = {}
-	for floor = 1, 2 do
+	for floor = 1, room.Floors do
 		local y = (if floor == 1 then 0 else F2) + 3
 		for _, x in { -108, -60, -20, 20, 60 } do
 			for _, z in { 50, 20, -10, -40, -70 } do
@@ -931,26 +971,52 @@ function LibraryBuilder.Build(): Library
 			end
 		end
 	end
-	table.insert(waypoints, Vector3.new(106, 3, 76))
-	table.insert(waypoints, Vector3.new(106, F2 + 3, 18))
 	table.insert(waypoints, Vector3.new(116, 3, 0))
+	if room.Floors >= 2 then
+		table.insert(waypoints, Vector3.new(106, 3, 76))
+		table.insert(waypoints, Vector3.new(106, F2 + 3, 18))
+	end
+	for i, point in waypoints do
+		waypoints[i] = point + offset
+	end
 
-	-- Pas aan het eind in Workspace zetten, dan komt alles in één keer bij de spelers aan
-	model.Parent = Workspace
-
-	local library = {
-		Model = model,
-		SpawnCFrame = CFrame.new(0, 3.5, 68),
-		Sections = sections,
-		Lockers = lockers,
-		Waypoints = waypoints,
-		KeySpots = {
+	local keySpots = if room.Floors >= 2
+		then {
 			Crimson = Vector3.new(106, 1.5, 40), -- onder de oprit
 			Golden = Vector3.new(-116, F2 + 1.5, -77), -- achterste hoek boven
 			Azure = Vector3.new(-80, 1.5, -77), -- achter de laatste kastenrij beneden
 			Emerald = Vector3.new(-40, F2 + 1.5, -58.5), -- achter het Verboden Archief
-		},
-		MonsterSpawn = Vector3.new(0, F2 + 6, -70),
+		}
+		else {
+			Crimson = Vector3.new(110, 1.5, 40),
+			Golden = Vector3.new(-118, 1.5, 20),
+			Azure = Vector3.new(-80, 1.5, -77),
+			Emerald = Vector3.new(40, 4.8, -55), -- op een leestafel
+		}
+	for id, spot in keySpots do
+		keySpots[id] = spot + offset
+	end
+	for _, section in sections do
+		section.Center += offset
+	end
+
+	-- Alles naar de plek van deze zaal schuiven en pas dan in de wereld zetten,
+	-- zodat het in één keer bij de spelers aankomt
+	model.WorldPivot = CFrame.new()
+	model:PivotTo(CFrame.new(offset))
+	model.Parent = parent
+
+	local library = {
+		Model = model,
+		Books = books,
+		Offset = offset,
+		SpawnCFrame = CFrame.new(Vector3.new(0, 3.5, 66) + offset),
+		ExitPrompt = exitPrompt,
+		Sections = sections,
+		Lockers = lockers,
+		Waypoints = waypoints,
+		KeySpots = keySpots,
+		MonsterSpawn = Vector3.new(0, (if room.Floors >= 2 then F2 else 0) + 6, -70) + offset,
 	}
 
 	local rayParams = RaycastParams.new()
@@ -962,11 +1028,12 @@ function LibraryBuilder.Build(): Library
 			or isInsideRect(probe, -9, 9, 55, 80) -- balie en spawn
 	end
 
+	-- x en z zijn hier coördinaten binnen de zaal (zonder offset)
 	local function surfaceAt(x: number, z: number, topY: number, params: RaycastParams): CFrame?
 		if blockedSpot(Vector3.new(x, 0, z)) then
 			return nil
 		end
-		local result = Workspace:Raycast(Vector3.new(x, topY, z), Vector3.new(0, -30, 0), params)
+		local result = Workspace:Raycast(Vector3.new(x, topY, z) + offset, Vector3.new(0, -30, 0), params)
 		if not result then
 			return nil
 		end
@@ -982,7 +1049,7 @@ function LibraryBuilder.Build(): Library
 	-- Geeft de CFrame van het oppervlak terug (het boek zet zichzelf erop).
 	function library.RandomBookSpot(_self: Library): CFrame
 		for _ = 1, 60 do
-			local floor = math.random(1, 2)
+			local floor = math.random(1, room.Floors)
 			local x = math.random(-Map.HalfX + 3, Map.HalfX - 3) + math.random()
 			local z = math.random(-Map.HalfZ + 3, Map.HalfZ - 3) + math.random()
 			local topY = if floor == 1 then F2 - 3 else Map.WallHeight - 4
@@ -991,7 +1058,7 @@ function LibraryBuilder.Build(): Library
 				return spot
 			end
 		end
-		return CFrame.new(0, 0, 50)
+		return CFrame.new(Vector3.new(0, 0, 50) + offset)
 	end
 
 	-- Plek in de buurt van een punt; met `extra` (bijv. de map met boeken) erbij
@@ -1000,13 +1067,14 @@ function LibraryBuilder.Build(): Library
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = if extra then { model, extra } else { model }
-		local floorY = if center.Y >= F2 - 1 then F2 else 0
+		local localCenter = center - offset
+		local floorY = if localCenter.Y >= F2 - 1 then F2 else 0
 		local topY = if floorY == 0 then F2 - 3 else Map.WallHeight - 4
 		for _ = 1, 12 do
 			local angle = math.random() * math.pi * 2
 			local r = math.sqrt(math.random()) * radius
-			local spot = surfaceAt(center.X + math.cos(angle) * r, center.Z + math.sin(angle) * r, topY, params)
-			if spot and spot.Position.Y < floorY + 6 then
+			local spot = surfaceAt(localCenter.X + math.cos(angle) * r, localCenter.Z + math.sin(angle) * r, topY, params)
+			if spot and spot.Position.Y - offset.Y < floorY + 6 then
 				return spot
 			end
 		end

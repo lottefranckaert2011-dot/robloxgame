@@ -112,14 +112,17 @@ function KeyService.Refresh(player: Player)
 	applyUpgrades(player)
 end
 
-function KeyService.Init(library)
-	local folder = Instance.new("Folder")
-	folder.Name = "Keys"
-	folder.Parent = library.Model
-	for _, info in Config.Keys do
-		local spot = library.KeySpots[info.Id]
-		if spot then
-			buildKey(info, spot, folder)
+-- Elke zaal heeft zijn eigen vier sleutels; je hoeft ze maar één keer te vinden
+function KeyService.Init(libraries: { any })
+	for _, library in libraries do
+		local folder = Instance.new("Folder")
+		folder.Name = "Keys"
+		folder.Parent = library.Model
+		for _, info in Config.Keys do
+			local spot = library.KeySpots[info.Id]
+			if spot then
+				buildKey(info, spot, folder)
+			end
 		end
 	end
 

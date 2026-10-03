@@ -17,6 +17,22 @@ Om met vrienden te spelen: *File → Publish to Roblox*.
 > Wil je dat munten en sleutels bewaard blijven? Zet dan in Studio *Game Settings → Security →
 > Enable Studio Access to API Services* aan (en publiceer het spel).
 
+## De hal en de zalen
+
+Je begint in de **hal**: een grote ruimte met boogramen, een paars gewelf met een kroonluchter en een reuzenboek op de vloer.
+Achterin staan drie deuren met een gloeiende ring ervoor. Stap in een ring (of druk op **E** bij de deur) om naar die zaal te gaan.
+
+| Zaal | Wat je krijgt |
+| --- | --- |
+| 🟢 **Starterzaal** | 1 verdieping, 12 kasten (72 boeken), 12 minuten, geen monster |
+| 🔵 **Grote Zaal** | 2 verdiepingen, 31 kasten (248 boeken), 20 minuten, De Bibliothecaresse, 1,5× munten |
+| 🔴 **Nachtmerriezaal** | Pikdonker (je krijgt een zaklamp), een sneller monster, 2× munten |
+
+Boven elke deur zie je hoeveel spelers er binnen zijn en hoe lang hun ronde nog duurt.
+Een ronde begint 10 seconden nadat de eerste speler binnenkomt; wie later komt, helpt gewoon mee.
+Na afloop (of via de voordeur van de zaal, of de knop **🚪 Terug naar de hal**) ga je terug naar de hal.
+In de hal staan ook kramen voor de **Winkel** en **Magie**.
+
 ## Hoe speel je
 
 | Toets | Wat het doet |
@@ -33,9 +49,9 @@ Om met vrienden te spelen: *File → Publish to Roblox*.
 Op een telefoon of tablet tik je gewoon op de knoppen in beeld.
 
 - Elk boek heeft een **code** zoals `1H` of `2G` op de rug. De groene bordjes op de kasten tonen dezelfde code.
-- Er zijn **31 kastsecties**: `1A`–`1N` op de begane grond en `2A`–`2Q` op de eerste verdieping (via de oprit rechts).
+- In de grote zalen zijn er **31 kastsecties**: `1A`–`1N` op de begane grond en `2A`–`2Q` op de eerste verdieping (via de oprit rechts).
 - Je kunt in het begin **3 boeken** tegelijk dragen.
-- Ruim je alle boeken op voordat de **20 minuten** om zijn, dan win je extra munten.
+- Ruim je alle boeken op voordat de tijd om is, dan win je extra munten.
 - Rechtsonder zie je hoeveel boeken er terug staan (📚) en hoeveel je draagt (📖).
 
 ### Munten uitgeven
@@ -48,7 +64,7 @@ Op een telefoon of tablet tik je gewoon op de knoppen in beeld.
 
 ### De Nightmare
 
-- Na 20 seconden wordt **De Bibliothecaresse** wakker. Ze loopt rond over beide verdiepingen,
+- In de Grote Zaal en de Nachtmerriezaal wordt na 20 seconden **De Bibliothecaresse** wakker. Ze loopt rond over beide verdiepingen,
   komt af op lawaai (sprinten, een boek in de verkeerde kast) en zit iedereen achterna die ze ziet.
 - Hoe meer boeken er terug staan, hoe sneller ze wordt.
 - Een rode, kloppende rand op je scherm betekent dat ze dichtbij is.
@@ -70,21 +86,25 @@ Ergens in de bibliotheek liggen vier gloeiende sleutels. Ze geven een upgrade di
 
 Bijna alles staat in [`src/shared/Config.luau`](src/shared/Config.luau): speeltijd, aantal boeken per sectie,
 snelheid van het monster, prijzen in de winkel, namen van secties en boektitels, enzovoort.
+De zalen zelf staan in `Config.Rooms`: daar kun je een zaal toevoegen of de tijd, het aantal kasten,
+het monster en de donkerte per zaal veranderen. Een nieuwe zaal krijgt vanzelf een deur in de hal.
 
-De hele bibliotheek wordt met code gebouwd zodra je op Play drukt (je ziet hem dus niet in de editor).
+De hal en alle zalen worden met code gebouwd zodra je op Play drukt (je ziet ze dus niet in de editor).
 Wil je modellen uit de Creator Store gebruiken, zoals planten, lampen of beelden? Sleep ze dan in Studio
 vanuit de *Toolbox* in de Workspace. Ze blijven gewoon staan naast de bibliotheek. Handige plekken om naar te kijken:
-de begane grond loopt van x −120 tot 120 en z −80 tot 80, en de eerste verdieping ligt op hoogte 24.
+de hal staat rond het punt (0, 0, 0) en is 140 × 100 studs; de zalen staan bij x = 1000, 2000 en 3000
+(elke zaal is 240 × 160 studs, de eerste verdieping ligt op hoogte 24).
 
 | Bestand | Wat erin zit |
 | --- | --- |
+| `src/server/LobbyBuilder.luau` | Bouwt de hal met de deuren, portaalringen, kroonluchter en kramen |
+| `src/server/RoomService.luau` | Naar binnen en naar buiten gaan, en de ronde van elke zaal |
 | `src/server/LibraryBuilder.luau` | Bouwt de bibliotheek: muren met bogen en pilaren, dakraam, kasten met bordjes, lampen, planten, tafels |
-| `src/server/BookService.luau` | Boeken verspreiden, oppakken, dragen en terugzetten |
+| `src/server/BookService.luau` | Boeken in een zaal: verspreiden, oppakken, dragen en terugzetten |
 | `src/server/ShopService.luau` | Winkel, magie en de assistent |
 | `src/server/MonsterService.luau` | De AI van De Bibliothecaresse (patrouilleren, horen, zien, jagen) |
 | `src/server/KeyService.luau` | De vier sleutels en hun upgrades |
 | `src/server/HideService.luau` | Verstoppen in kasten |
-| `src/server/RoundService.luau` | Rondes: pauze → opruimen → gewonnen/verloren |
 | `src/server/DataService.luau` | Munten, sleutels en records opslaan |
 | `src/client/*` | Scherm (HUD), besturing, vaardigheden en griezel-effecten |
 

@@ -32,6 +32,16 @@ local function getRoot(): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
+-- Het model van de zaal waar je nu bent (nil = in de hal)
+local function roomModel(): Instance?
+	local id = player:GetAttribute("Room")
+	local rooms = Workspace:FindFirstChild("Rooms")
+	if type(id) ~= "string" or not rooms then
+		return nil
+	end
+	return rooms:FindFirstChild(id)
+end
+
 local function drop()
 	if #Controls.Inventory > 0 then
 		Remotes.Action:FireServer("Drop")
@@ -41,8 +51,10 @@ end
 -- Inzicht: laat even alle losse boeken in de buurt oplichten
 local function insight(): boolean
 	local root = getRoot()
-	local books = Workspace:FindFirstChild("Books")
+	local room = roomModel()
+	local books = room and room:FindFirstChild("Books")
 	if not root or not books then
+		Hud.Notify("Ga eerst een zaal in.", Color3.fromRGB(220, 220, 220))
 		return false
 	end
 	local markers = {}
@@ -90,8 +102,8 @@ local function shelfGuide(): boolean
 		return false
 	end
 	local root = getRoot()
-	local library = Workspace:FindFirstChild("Library")
-	local sections = library and library:FindFirstChild("Sections")
+	local room = roomModel()
+	local sections = room and room:FindFirstChild("Sections")
 	local sectionModel = sections and sections:FindFirstChild("Section_" .. book.Code)
 	local zone = sectionModel and sectionModel:FindFirstChild("PromptZone") :: BasePart?
 	if not root or not zone then

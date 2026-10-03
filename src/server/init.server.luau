@@ -1,7 +1,8 @@
--- Startpunt van de server: bouwt de bibliotheek en start alle systemen.
+-- Startpunt van de server: bouwt de hal en de zalen en start alle systemen.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 
@@ -9,12 +10,11 @@ local Config = require(ReplicatedStorage.Shared.Config)
 require(ReplicatedStorage.Shared.Remotes) -- maakt de RemoteEvents aan
 
 local LibraryBuilder = require(script.LibraryBuilder)
-local BookService = require(script.BookService)
-local MonsterService = require(script.MonsterService)
+local LobbyBuilder = require(script.LobbyBuilder)
 local KeyService = require(script.KeyService)
 local HideService = require(script.HideService)
 local DataService = require(script.DataService)
-local RoundService = require(script.RoundService)
+local RoomService = require(script.RoomService)
 local ShopService = require(script.ShopService)
 
 -- Warme, lichte bibliotheek zoals in het origineel
@@ -51,37 +51,23 @@ StarterPlayer.CharacterUseJumpPower = false
 StarterPlayer.CharacterJumpHeight = Config.BaseJumpHeight
 StarterPlayer.EnableMouseLockOption = false -- Shift is voor sprinten
 
-local library = LibraryBuilder.Build()
+local lobby = LobbyBuilder.Build(Workspace)
 
-BookService.Init(library)
-MonsterService.Init(library)
-KeyService.Init(library)
-HideService.Init(library)
+local roomsFolder = Instance.new("Folder")
+roomsFolder.Name = "Rooms"
+roomsFolder.Parent = Workspace
+local libraries = {}
+local libraryList = {}
+for _, room in Config.Rooms do
+	local library = LibraryBuilder.Build(room, roomsFolder)
+	libraries[room.Id] = library
+	table.insert(libraryList, library)
+end
+
+KeyService.Init(libraryList)
+HideService.Init(libraryList)
 DataService.Init()
-
-MonsterService.OnCatch = function(player)
-	BookService.Scatter(player)
-end
-MonsterService.OnHiddenCatch = function(player)
-	HideService.Exit(player)
-end
-
--- Wie de verdieping af valt of vastzit, komt terug bij de balie
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function(character)
-		local root = character:WaitForChild("HumanoidRootPart") :: BasePart
-		task.spawn(function()
-			while character.Parent do
-				if root.Position.Y < -20 then
-					character:PivotTo(library.SpawnCFrame)
-				end
-				task.wait(2)
-			end
-		end)
-	end)
-end)
-
+RoomService.Init(lobby, libraries)
 ShopService.Init()
-RoundService.Init()
 
 print(Config.GameName .. " is gestart!")

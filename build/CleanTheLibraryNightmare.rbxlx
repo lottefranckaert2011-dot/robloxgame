@@ -27,6 +27,22 @@ export type Section = {
 	Titles: { string },
 }
 
+export type RoomInfo = {
+	Id: string,
+	Name: string,
+	Description: string,
+	Color: Color3,
+	Floors: number, -- 1 of 2 verdiepingen
+	MaxSections: number, -- hoeveel kastsecties (van 1A af)
+	BooksPerSection: number,
+	RoundTime: number,
+	Monster: boolean,
+	MonsterSpeed: number, -- vermenigvuldiger voor de snelheid van het monster
+	Dark: boolean, -- donkere nachtmerrie-sfeer
+	CoinMultiplier: number,
+	Offset: Vector3, -- waar de zaal in de wereld staat
+}
+
 export type KeyInfo = {
 	Id: string,
 	Name: string,
@@ -38,11 +54,9 @@ local Config = {}
 
 Config.GameName = "Clean The Library 📖 [Nightmare]"
 
--- Ronde
-Config.RoundTime = 20 * 60 -- seconden om de bibliotheek op te ruimen
-Config.IntermissionTime = 15
-Config.EndScreenTime = 10
-Config.BooksPerSection = 8
+-- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
+Config.StartCountdown = 10 -- seconden tussen binnenkomen en de start
+Config.EndScreenTime = 8 -- daarna ga je terug naar de hal
 Config.RespawnTime = 4
 
 -- Speler
@@ -289,6 +303,79 @@ Config.Sections = {
 	{ Code = "2Q", Name = "Verboden Archief", Floor = 2, Titles = { "Shhhhh...", "De Regels van de Bibliothecaresse", "Nooit Meer Rennen" } },
 } :: { Section }
 
+-- De zalen waaruit je in de hal kunt kiezen
+Config.Rooms = {
+	{
+		Id = "Starter",
+		Name = "Starterzaal",
+		Description = "1 verdieping · 12 kasten · geen monster",
+		Color = Color3.fromRGB(90, 210, 120),
+		Floors = 1,
+		MaxSections = 12,
+		BooksPerSection = 6,
+		RoundTime = 12 * 60,
+		Monster = false,
+		MonsterSpeed = 1,
+		Dark = false,
+		CoinMultiplier = 1,
+		Offset = Vector3.new(1000, 0, 0),
+	},
+	{
+		Id = "Classic",
+		Name = "Grote Zaal",
+		Description = "2 verdiepingen · 31 kasten · De Bibliothecaresse",
+		Color = Color3.fromRGB(90, 160, 255),
+		Floors = 2,
+		MaxSections = 31,
+		BooksPerSection = 8,
+		RoundTime = 20 * 60,
+		Monster = true,
+		MonsterSpeed = 1,
+		Dark = false,
+		CoinMultiplier = 1.5,
+		Offset = Vector3.new(2000, 0, 0),
+	},
+	{
+		Id = "Nightmare",
+		Name = "Nachtmerriezaal",
+		Description = "Pikdonker · sneller monster · dubbele munten",
+		Color = Color3.fromRGB(220, 60, 90),
+		Floors = 2,
+		MaxSections = 31,
+		BooksPerSection = 8,
+		RoundTime = 20 * 60,
+		Monster = true,
+		MonsterSpeed = 1.2,
+		Dark = true,
+		CoinMultiplier = 2,
+		Offset = Vector3.new(3000, 0, 0),
+	},
+} :: { RoomInfo }
+
+function Config.FindRoom(id: string): RoomInfo?
+	for _, room in Config.Rooms do
+		if room.Id == id then
+			return room
+		end
+	end
+	return nil
+end
+
+-- De kastsecties die in een zaal staan (met hun index voor de kleur)
+function Config.RoomSections(room: RoomInfo): { { Section: Section, Index: number } }
+	local list = {}
+	for index, section in Config.Sections do
+		if #list < room.MaxSections and section.Floor <= room.Floors then
+			table.insert(list, { Section = section, Index = index })
+		end
+	end
+	return list
+end
+
+function Config.RoomTotalBooks(room: RoomInfo): number
+	return #Config.RoomSections(room) * room.BooksPerSection
+end
+
 -- Kleur per sectie (verdeeld over de regenboog), gebruikt in het scherm
 function Config.SectionColor(index: number): Color3
 	return Color3.fromHSV(((index - 1) * 0.618) % 1, 0.55, 0.95)
@@ -303,9 +390,6 @@ function Config.FindSection(code: string): (Section?, number?)
 	return nil, nil
 end
 
-function Config.TotalBooks(): number
-	return #Config.Sections * Config.BooksPerSection
-end
 
 return Config
 ]]></string>
@@ -364,10 +448,11 @@ return {
       <Properties>
         <string name="Name">Server</string>
         <token name="RunContext">0</token>
-        <string name="Source"><![CDATA[-- Startpunt van de server: bouwt de bibliotheek en start alle systemen.
+        <string name="Source"><![CDATA[-- Startpunt van de server: bouwt de hal en de zalen en start alle systemen.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 
@@ -375,12 +460,11 @@ local Config = require(ReplicatedStorage.Shared.Config)
 require(ReplicatedStorage.Shared.Remotes) -- maakt de RemoteEvents aan
 
 local LibraryBuilder = require(script.LibraryBuilder)
-local BookService = require(script.BookService)
-local MonsterService = require(script.MonsterService)
+local LobbyBuilder = require(script.LobbyBuilder)
 local KeyService = require(script.KeyService)
 local HideService = require(script.HideService)
 local DataService = require(script.DataService)
-local RoundService = require(script.RoundService)
+local RoomService = require(script.RoomService)
 local ShopService = require(script.ShopService)
 
 -- Warme, lichte bibliotheek zoals in het origineel
@@ -417,38 +501,24 @@ StarterPlayer.CharacterUseJumpPower = false
 StarterPlayer.CharacterJumpHeight = Config.BaseJumpHeight
 StarterPlayer.EnableMouseLockOption = false -- Shift is voor sprinten
 
-local library = LibraryBuilder.Build()
+local lobby = LobbyBuilder.Build(Workspace)
 
-BookService.Init(library)
-MonsterService.Init(library)
-KeyService.Init(library)
-HideService.Init(library)
+local roomsFolder = Instance.new("Folder")
+roomsFolder.Name = "Rooms"
+roomsFolder.Parent = Workspace
+local libraries = {}
+local libraryList = {}
+for _, room in Config.Rooms do
+	local library = LibraryBuilder.Build(room, roomsFolder)
+	libraries[room.Id] = library
+	table.insert(libraryList, library)
+end
+
+KeyService.Init(libraryList)
+HideService.Init(libraryList)
 DataService.Init()
-
-MonsterService.OnCatch = function(player)
-	BookService.Scatter(player)
-end
-MonsterService.OnHiddenCatch = function(player)
-	HideService.Exit(player)
-end
-
--- Wie de verdieping af valt of vastzit, komt terug bij de balie
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function(character)
-		local root = character:WaitForChild("HumanoidRootPart") :: BasePart
-		task.spawn(function()
-			while character.Parent do
-				if root.Position.Y < -20 then
-					character:PivotTo(library.SpawnCFrame)
-				end
-				task.wait(2)
-			end
-		end)
-	end)
-end)
-
+RoomService.Init(lobby, libraries)
 ShopService.Init()
-RoundService.Init()
 
 print(Config.GameName .. " is gestart!")
 ]]></string>
@@ -456,12 +526,11 @@ print(Config.GameName .. " is gestart!")
       <Item class="ModuleScript" referent="7">
         <Properties>
           <string name="Name">BookService</string>
-          <string name="Source"><![CDATA[-- Boeken: verspreiden, oppakken, dragen, laten vallen en in de juiste kast zetten.
+          <string name="Source"><![CDATA[-- Boeken in één zaal: verspreiden, oppakken, dragen, laten vallen en in de juiste kast zetten.
+-- Elke zaal krijgt zijn eigen BookService (BookService.new).
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -502,21 +571,6 @@ local BOOK_FONTS = {
 
 local BASE_SIZE = Vector3.new(1.4, 0.35, 1.9)
 local PAGES_COLOR = Color3.fromRGB(246, 236, 210)
-local CLUSTERS = 45
-
-local BookService = {}
-BookService.Library = nil :: any
-BookService.Placed = 0
-BookService.Active = false -- alleen tijdens een ronde kun je boeken pakken
--- Wordt door andere services ingevuld
-BookService.OnAllPlaced = nil :: (() -> ())?
-BookService.OnMistake = nil :: ((player: Player, position: Vector3) -> ())?
-BookService.OnBookPlaced = nil :: ((player: Player, count: number) -> ())?
-
-local folder: Folder
-local carried: { [Player]: { BookData } } = {}
-local placedPerSection: { [string]: number } = {}
-local bookData: { [BasePart]: BookData } = {}
 local nextId = 0
 
 local function playSound(id: string, parent: Instance)
@@ -550,15 +604,6 @@ local function getRoot(player: Player): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function sendInventory(player: Player)
-	local list = {}
-	local books: { BookData } = carried[player] or {}
-	for _, book in books do
-		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color })
-	end
-	Remotes.Inventory:FireClient(player, list, getCapacity(player))
-end
-
 -- Maakt de onderdelen van een boek: kaft + bladzijden die aan drie kanten uitsteken.
 local function buildBookParts(book: BookData, scale: number): BasePart
 	local size = BASE_SIZE * scale
@@ -589,7 +634,7 @@ local function buildBookParts(book: BookData, scale: number): BasePart
 	weld.Parent = pages
 	pages.Parent = cover
 
-	-- Voorkant: titel + code
+	-- Voorkant: titel tussen twee gouden banden
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Top
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
@@ -645,7 +690,7 @@ local function moveBook(cover: BasePart, cf: CFrame)
 end
 
 -- Stapel boeken die je zichtbaar voor je uit draagt
-local function updateCarryVisual(player: Player)
+local function updateCarryVisual(player: Player, books: { BookData })
 	local character = player.Character
 	if not character then
 		return
@@ -655,11 +700,7 @@ local function updateCarryVisual(player: Player)
 	if old then
 		old:Destroy()
 	end
-	if not root then
-		return
-	end
-	local books = carried[player] or {}
-	if #books == 0 then
+	if not root or #books == 0 then
 		return
 	end
 	local model = Instance.new("Model")
@@ -687,13 +728,79 @@ local function updateCarryVisual(player: Player)
 	model.Parent = character
 end
 
-local function changed(player: Player)
-	updateCarryVisual(player)
-	sendInventory(player)
+local BookService = {}
+BookService.__index = BookService
+
+export type BookService = typeof(setmetatable(
+	{} :: {
+		Room: Config.RoomInfo,
+		Library: any,
+		State: Instance,
+		Folder: Folder,
+		Total: number,
+		Placed: number,
+		Active: boolean,
+		Carried: { [Player]: { BookData } },
+		PlacedPerSection: { [string]: number },
+		BookData: { [BasePart]: BookData },
+		OnAllPlaced: (() -> ())?,
+		OnMistake: ((player: Player, position: Vector3) -> ())?,
+		OnBookPlaced: ((player: Player, count: number) -> ())?,
+	},
+	BookService
+))
+
+function BookService.new(room: Config.RoomInfo, library, state: Instance): BookService
+	local self = setmetatable({
+		Room = room,
+		Library = library,
+		State = state,
+		Folder = library.Books,
+		Total = Config.RoomTotalBooks(room),
+		Placed = 0,
+		Active = false, -- alleen tijdens een ronde kun je boeken pakken
+		Carried = {},
+		PlacedPerSection = {},
+		BookData = {},
+		OnAllPlaced = nil,
+		OnMistake = nil,
+		OnBookPlaced = nil,
+	}, BookService)
+
+	for code, section in library.Sections do
+		for _, prompt in section.Prompts do
+			prompt.Triggered:Connect(function(player)
+				self:Place(player, code)
+			end)
+		end
+	end
+	self:Clear()
+	return self
+end
+
+function BookService.AddPlayer(self: BookService, player: Player)
+	self.Carried[player] = self.Carried[player] or {}
+	self:Changed(player)
+end
+
+function BookService.RemovePlayer(self: BookService, player: Player)
+	self:Scatter(player)
+	self.Carried[player] = nil
+	updateCarryVisual(player, {})
+end
+
+function BookService.Changed(self: BookService, player: Player)
+	local books = self.Carried[player] or {}
+	updateCarryVisual(player, books)
+	local list = {}
+	for _, book in books do
+		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color })
+	end
+	Remotes.Inventory:FireClient(player, list, getCapacity(player))
 end
 
 -- `surface` is de plek op de vloer/tafel; het boek gaat erbovenop liggen
-local function makeLooseBook(book: BookData, surface: CFrame)
+function BookService.MakeLooseBook(self: BookService, book: BookData, surface: CFrame)
 	local p = buildBookParts(book, book.Scale)
 	local cf = surface * CFrame.new(0, p.Size.Y / 2, 0)
 	-- Af en toe ligt een boek scheef tegen iets aan
@@ -715,26 +822,26 @@ local function makeLooseBook(book: BookData, surface: CFrame)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = p
 	prompt.Triggered:Connect(function(player)
-		BookService.PickUp(player, p)
+		self:PickUp(player, p)
 	end)
 
-	bookData[p] = book
+	self.BookData[p] = book
 	p.Destroying:Connect(function()
-		bookData[p] = nil
+		self.BookData[p] = nil
 	end)
-	p.Parent = folder
+	p.Parent = self.Folder
 	return p
 end
 
-function BookService.PickUp(player: Player, bookPart: BasePart, silent: boolean?): boolean
-	if not BookService.Active or bookPart.Parent ~= folder or bookPart:GetAttribute("Flying") then
+function BookService.PickUp(self: BookService, player: Player, bookPart: BasePart, silent: boolean?): boolean
+	if not self.Active or bookPart.Parent ~= self.Folder or bookPart:GetAttribute("Flying") then
 		return false
 	end
 	if player:GetAttribute("Hidden") then
 		return false
 	end
-	local list = carried[player]
-	local book = bookData[bookPart]
+	local list = self.Carried[player]
+	local book = self.BookData[bookPart]
 	if not list or not book then
 		return false
 	end
@@ -750,82 +857,80 @@ function BookService.PickUp(player: Player, bookPart: BasePart, silent: boolean?
 	end
 	bookPart:Destroy()
 	if not silent then
-		changed(player)
+		self:Changed(player)
 	end
 	return true
 end
 
-local function updateSign(section)
-	local count = placedPerSection[section.Code] or 0
-	local done = count >= Config.BooksPerSection
+function BookService.UpdateSign(self: BookService, section)
+	local count = self.PlacedPerSection[section.Code] or 0
+	local perSection = self.Room.BooksPerSection
+	local done = count >= perSection
 	for _, label in section.Counters do
-		label.Text = if done
-			then "✔ " .. section.Name
-			else string.format("%s · %d/%d", section.Name, count, Config.BooksPerSection)
+		label.Text = if done then "✔ " .. section.Name else string.format("%s · %d/%d", section.Name, count, perSection)
 		label.TextColor3 = if done then Color3.fromRGB(150, 255, 160) else Color3.fromRGB(230, 220, 190)
 	end
 end
 
 -- Zet één boek op de volgende lege plek in de kast
-local function fillSlot(section, book: BookData)
-	local count = (placedPerSection[section.Code] or 0) + 1
+function BookService.FillSlot(self: BookService, section, book: BookData)
+	local count = (self.PlacedPerSection[section.Code] or 0) + 1
 	local slot = section.Slots[count]
 	if slot then
 		slot.Transparency = 0
 		slot.Material = Enum.Material.SmoothPlastic
 		slot.Color = book.Color
 	end
-	placedPerSection[section.Code] = count
-	BookService.Placed += 1
+	self.PlacedPerSection[section.Code] = count
+	self.Placed += 1
 end
 
 -- Na het terugzetten: teller, melding, beloning, en kijken of alles klaar is
-local function afterPlaced(player: Player, section, placedNow: number, quiet: boolean?)
-	Workspace:SetAttribute("Placed", BookService.Placed)
-	updateSign(section)
-	if BookService.OnBookPlaced then
-		BookService.OnBookPlaced(player, placedNow)
+function BookService.AfterPlaced(self: BookService, player: Player, section, placedNow: number, quiet: boolean?)
+	self.State:SetAttribute("Placed", self.Placed)
+	self:UpdateSign(section)
+	if self.OnBookPlaced then
+		self.OnBookPlaced(player, placedNow)
 	end
-	if (placedPerSection[section.Code] or 0) >= Config.BooksPerSection then
-		Remotes.Notify:FireAllClients(
-			string.format("Sectie %s %s is compleet!", section.Code, section.Name),
-			Color3.fromRGB(150, 255, 160)
-		)
+	if (self.PlacedPerSection[section.Code] or 0) >= self.Room.BooksPerSection then
+		for other in self.Carried do
+			notify(other, string.format("Sectie %s %s is compleet!", section.Code, section.Name), Color3.fromRGB(150, 255, 160))
+		end
 	elseif not quiet then
 		notify(player, string.format("+%d boek%s in %s", placedNow, if placedNow == 1 then "" else "en", section.Name), Color3.fromRGB(120, 255, 140))
 	end
-	if BookService.Placed >= Config.TotalBooks() and BookService.OnAllPlaced then
-		BookService.OnAllPlaced()
+	if self.Placed >= self.Total and self.OnAllPlaced then
+		self.OnAllPlaced()
 	end
 end
 
 -- Zet alle gedragen boeken met deze code in de kast. Geeft het aantal terug.
-local function placeMatching(player: Player, code: string, quiet: boolean?): number
-	local list = carried[player]
-	local section = BookService.Library.Sections[code]
+function BookService.PlaceMatching(self: BookService, player: Player, code: string, quiet: boolean?): number
+	local list = self.Carried[player]
+	local section = self.Library.Sections[code]
 	if not list or not section then
 		return 0
 	end
 	local placedNow = 0
 	for i = #list, 1, -1 do
 		if list[i].Code == code then
-			fillSlot(section, list[i])
+			self:FillSlot(section, list[i])
 			table.remove(list, i)
 			placedNow += 1
 		end
 	end
 	if placedNow > 0 then
-		afterPlaced(player, section, placedNow, quiet)
+		self:AfterPlaced(player, section, placedNow, quiet)
 	end
 	return placedNow
 end
 
-function BookService.Place(player: Player, code: string)
-	if not BookService.Active then
+function BookService.Place(self: BookService, player: Player, code: string)
+	if not self.Active then
 		return
 	end
-	local list = carried[player]
-	local section = BookService.Library.Sections[code]
+	local list = self.Carried[player]
+	local section = self.Library.Sections[code]
 	if not list or not section then
 		return
 	end
@@ -835,14 +940,14 @@ function BookService.Place(player: Player, code: string)
 	end
 
 	local character = player.Character
-	local placedNow = placeMatching(player, code)
+	local placedNow = self:PlaceMatching(player, code)
 	if placedNow == 0 then
 		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
 			playSound(Config.SoundIds.Wrong, character)
 			local root = getRoot(player)
-			if root and BookService.OnMistake then
-				BookService.OnMistake(player, root.Position)
+			if root and self.OnMistake then
+				self.OnMistake(player, root.Position)
 			end
 		end
 		return
@@ -850,18 +955,18 @@ function BookService.Place(player: Player, code: string)
 	if character then
 		playSound(Config.SoundIds.Place, character)
 	end
-	changed(player)
+	self:Changed(player)
 end
 
 -- Magie "Verzamelen": pak de dichtstbijzijnde boeken op
-function BookService.Assemble(player: Player, radius: number): number
+function BookService.Assemble(self: BookService, player: Player, radius: number): number
 	local root = getRoot(player)
-	local list = carried[player]
-	if not BookService.Active or not root or not list then
+	local list = self.Carried[player]
+	if not self.Active or not root or not list then
 		return 0
 	end
 	local nearby = {}
-	for _, p in folder:GetChildren() do
+	for _, p in self.Folder:GetChildren() do
 		if p:IsA("BasePart") and not p:GetAttribute("Flying") then
 			local d = (p.Position - root.Position).Magnitude
 			if d <= radius then
@@ -877,21 +982,21 @@ function BookService.Assemble(player: Player, radius: number): number
 		if #list >= getCapacity(player) then
 			break
 		end
-		if BookService.PickUp(player, entry.part, true) then
+		if self:PickUp(player, entry.part, true) then
 			got += 1
 		end
 	end
 	if got > 0 then
 		playSound(Config.SoundIds.Pickup, root)
-		changed(player)
+		self:Changed(player)
 	end
 	return got
 end
 
 -- Magie "Auto-plaatsen": alle gedragen boeken naar de goede kast
-function BookService.AutoShelf(player: Player): number
-	local list = carried[player]
-	if not BookService.Active or not list or #list == 0 then
+function BookService.AutoShelf(self: BookService, player: Player): number
+	local list = self.Carried[player]
+	if not self.Active or not list or #list == 0 then
 		return 0
 	end
 	local codes = {}
@@ -900,26 +1005,26 @@ function BookService.AutoShelf(player: Player): number
 	end
 	local total = 0
 	for code in codes do
-		total += placeMatching(player, code, true)
+		total += self:PlaceMatching(player, code, true)
 	end
 	if total > 0 then
 		local root = getRoot(player)
 		if root then
 			playSound(Config.SoundIds.Place, root)
 		end
-		changed(player)
+		self:Changed(player)
 	end
 	return total
 end
 
 -- De assistent laat een willekeurig boek naar de goede kast vliegen
-function BookService.AssistantPlace(player: Player): boolean
-	if not BookService.Active then
+function BookService.AssistantPlace(self: BookService, player: Player): boolean
+	if not self.Active then
 		return false
 	end
 	local candidates = {}
-	for _, p in folder:GetChildren() do
-		if p:IsA("BasePart") and not p:GetAttribute("Flying") and bookData[p] then
+	for _, p in self.Folder:GetChildren() do
+		if p:IsA("BasePart") and not p:GetAttribute("Flying") and self.BookData[p] then
 			table.insert(candidates, p)
 		end
 	end
@@ -927,8 +1032,8 @@ function BookService.AssistantPlace(player: Player): boolean
 		return false
 	end
 	local p = candidates[math.random(1, #candidates)] :: BasePart
-	local book = bookData[p]
-	local section = BookService.Library.Sections[book.Code]
+	local book = self.BookData[p]
+	local section = self.Library.Sections[book.Code]
 	if not section then
 		return false
 	end
@@ -957,78 +1062,76 @@ function BookService.AssistantPlace(player: Player): boolean
 	)
 	tween2:Play()
 	tween2.Completed:Wait()
-	if not p.Parent or not BookService.Active then
+	if not p.Parent or not self.Active then
 		return false
 	end
 	p:Destroy()
-	fillSlot(section, book)
-	afterPlaced(player, section, 1, true)
+	self:FillSlot(section, book)
+	self:AfterPlaced(player, section, 1, true)
 	return true
 end
 
--- Zoek een plek op de grond vlak bij een positie
-local function groundNear(position: Vector3): CFrame
-	return BookService.Library:BookSpotNear(position, 3, folder) or BookService.Library:RandomBookSpot()
-end
-
-function BookService.Drop(player: Player)
-	local list = carried[player]
+function BookService.Drop(self: BookService, player: Player)
+	local list = self.Carried[player]
 	if not list or #list == 0 then
 		return
 	end
 	local root = getRoot(player)
 	for _, book in list do
-		makeLooseBook(book, if root then groundNear(root.Position) else BookService.Library:RandomBookSpot())
+		local spot = root and self.Library:BookSpotNear(root.Position, 3, self.Folder)
+		self:MakeLooseBook(book, spot or self.Library:RandomBookSpot())
 	end
 	table.clear(list)
-	changed(player)
+	self:Changed(player)
 end
 
--- Als het monster je pakt, vliegen je boeken terug door de hele bibliotheek
-function BookService.Scatter(player: Player)
-	local list = carried[player]
+-- Als het monster je pakt, vliegen je boeken terug door de hele zaal
+function BookService.Scatter(self: BookService, player: Player)
+	local list = self.Carried[player]
 	if not list or #list == 0 then
 		return
 	end
-	if BookService.Active then
+	if self.Active then
 		for _, book in list do
-			makeLooseBook(book, BookService.Library:RandomBookSpot())
+			self:MakeLooseBook(book, self.Library:RandomBookSpot())
 		end
 	end
 	table.clear(list)
-	changed(player)
+	self:Changed(player)
 end
 
-function BookService.Clear()
-	BookService.Active = false
-	folder:ClearAllChildren()
-	for player, list in carried do
+function BookService.Clear(self: BookService)
+	self.Active = false
+	self.Folder:ClearAllChildren()
+	for player, list in self.Carried do
 		table.clear(list)
-		changed(player)
+		self:Changed(player)
 	end
-	table.clear(placedPerSection)
-	BookService.Placed = 0
-	Workspace:SetAttribute("Placed", 0)
-	Workspace:SetAttribute("Total", Config.TotalBooks())
-	for _, section in BookService.Library.Sections do
+	table.clear(self.PlacedPerSection)
+	self.Placed = 0
+	self.State:SetAttribute("Placed", 0)
+	self.State:SetAttribute("Total", self.Total)
+	for _, section in self.Library.Sections do
 		for _, slot in section.Slots do
 			slot.Transparency = 0.75
 			slot.Material = Enum.Material.Glass
 			slot.Color = Color3.fromRGB(255, 245, 225)
 		end
-		updateSign(section)
+		self:UpdateSign(section)
 	end
 end
 
-function BookService.SpawnAll()
-	local library = BookService.Library
-	-- Boeken liggen in rommelige stapels verspreid door de bibliotheek
+function BookService.SpawnAll(self: BookService)
+	local library = self.Library
+	-- Boeken liggen in rommelige stapels verspreid door de zaal
 	local clusters = {}
-	for i = 1, CLUSTERS do
+	local clusterCount = math.max(12, math.floor(self.Total / 5.5))
+	for i = 1, clusterCount do
 		clusters[i] = library:RandomBookSpot().Position
 	end
-	for _, section in Config.Sections do
-		for i = 1, Config.BooksPerSection do
+	for _, entry in Config.RoomSections(self.Room) do
+		local section = entry.Section
+		for i = 1, self.Room.BooksPerSection do
 			nextId += 1
 			local title = section.Titles[(i - 1) % #section.Titles + 1]
 			if i > #section.Titles then
@@ -1044,56 +1147,11 @@ function BookService.SpawnAll()
 				Font = BOOK_FONTS[math.random(1, #BOOK_FONTS)],
 			}
 			local center = clusters[math.random(1, #clusters)]
-			local spot = library:BookSpotNear(center, 7, folder) or library:RandomBookSpot()
-			makeLooseBook(book, spot)
+			local spot = library:BookSpotNear(center, 7, self.Folder) or library:RandomBookSpot()
+			self:MakeLooseBook(book, spot)
 		end
 	end
-	BookService.Active = true
-end
-
-function BookService.Init(library)
-	BookService.Library = library
-	folder = Instance.new("Folder")
-	folder.Name = "Books"
-	folder.Parent = Workspace
-
-	for code, section in library.Sections do
-		for _, prompt in section.Prompts do
-			prompt.Triggered:Connect(function(player)
-				BookService.Place(player, code)
-			end)
-		end
-	end
-
-	local function onPlayer(player: Player)
-		carried[player] = {}
-		player.CharacterAdded:Connect(function(character)
-			local humanoid = character:WaitForChild("Humanoid") :: Humanoid
-			humanoid.Died:Connect(function()
-				BookService.Scatter(player)
-			end)
-			task.defer(changed, player)
-		end)
-		player:GetAttributeChangedSignal("Capacity"):Connect(function()
-			sendInventory(player)
-		end)
-	end
-	Players.PlayerAdded:Connect(onPlayer)
-	for _, player in Players:GetPlayers() do
-		onPlayer(player)
-	end
-	Players.PlayerRemoving:Connect(function(player)
-		BookService.Scatter(player)
-		carried[player] = nil
-	end)
-
-	Remotes.Action.OnServerEvent:Connect(function(player, action)
-		if action == "Drop" then
-			BookService.Drop(player)
-		end
-	end)
-
-	BookService.Clear()
+	self.Active = true
 end
 
 return BookService
@@ -1347,15 +1405,17 @@ local function enter(player: Player, locker)
 	Remotes.Notify:FireClient(player, "Je zit verstopt. Houd je adem in...", Color3.fromRGB(180, 180, 255))
 end
 
-function HideService.Init(library)
-	for _, locker in library.Lockers do
-		locker.Prompt.Triggered:Connect(function(player)
-			if hidingIn[player] == locker then
-				HideService.Exit(player)
-			elseif not hidingIn[player] then
-				enter(player, locker)
-			end
-		end)
+function HideService.Init(libraries: { any })
+	for _, library in libraries do
+		for _, locker in library.Lockers do
+			locker.Prompt.Triggered:Connect(function(player)
+				if hidingIn[player] == locker then
+					HideService.Exit(player)
+				elseif not hidingIn[player] then
+					enter(player, locker)
+				end
+			end)
+		end
 	end
 
 	local function onPlayer(player: Player)
@@ -1505,14 +1565,17 @@ function KeyService.Refresh(player: Player)
 	applyUpgrades(player)
 end
 
-function KeyService.Init(library)
-	local folder = Instance.new("Folder")
-	folder.Name = "Keys"
-	folder.Parent = library.Model
-	for _, info in Config.Keys do
-		local spot = library.KeySpots[info.Id]
-		if spot then
-			buildKey(info, spot, folder)
+-- Elke zaal heeft zijn eigen vier sleutels; je hoeft ze maar één keer te vinden
+function KeyService.Init(libraries: { any })
+	for _, library in libraries do
+		local folder = Instance.new("Folder")
+		folder.Name = "Keys"
+		folder.Parent = library.Model
+		for _, info in Config.Keys do
+			local spot = library.KeySpots[info.Id]
+			if spot then
+				buildKey(info, spot, folder)
+			end
 		end
 	end
 
@@ -1553,6 +1616,14 @@ local F2 = Map.FloorHeight
 
 local LibraryBuilder = {}
 
+-- Instellingen van de zaal die nu gebouwd wordt
+local currentFloors = 2
+local currentDark = false
+
+local function levels(): { number }
+	return if currentFloors >= 2 then { 0, F2 } else { 0 }
+end
+
 export type SectionData = {
 	Code: string,
 	Name: string,
@@ -1576,7 +1647,10 @@ export type LockerData = {
 
 export type Library = {
 	Model: Model,
+	Books: Folder,
+	Offset: Vector3,
 	SpawnCFrame: CFrame,
+	ExitPrompt: ProximityPrompt,
 	Sections: { [string]: SectionData },
 	Lockers: { LockerData },
 	Waypoints: { Vector3 },
@@ -1703,6 +1777,9 @@ local function buildFloors(folder: Folder)
 		Parent = folder,
 	})
 	bookSurface(floor1)
+	if currentFloors < 2 then
+		return
+	end
 
 	-- Eerste verdieping met een gat voor de oprit (x 100..112, z 24..72):
 	-- bovenkant hout, onderkant gestuukt plafond
@@ -1801,9 +1878,9 @@ local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward
 	end
 
 	-- Lijsten: plint onderaan en een rode lijst onder elk plafond
-	for _, y0 in { 0, F2 } do
+	for _, y0 in levels() do
 		deco({ Name = "Baseboard", Size = Vector3.new(length, 1, 0.4), CFrame = at(0, y0 + 0.5, 0.2), Color = DARK_WOOD, Parent = folder })
-		local top = if y0 == 0 then F2 - 2 else Map.WallHeight
+		local top = if y0 == 0 and currentFloors >= 2 then F2 - 2 else Map.WallHeight
 		deco({ Name = "Moulding", Size = Vector3.new(length, 1.4, 1), CFrame = at(0, top - 0.7, 0.5), Color = MOULDING, Material = Enum.Material.Wood, Parent = folder })
 		deco({ Name = "MouldingTrim", Size = Vector3.new(length, 0.3, 1.3), CFrame = at(0, top - 1.55, 0.65), Color = PILLAR, Material = Enum.Material.Wood, Parent = folder })
 	end
@@ -1821,7 +1898,7 @@ local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward
 			Parent = folder,
 		})
 		-- Wandlamp op de pilaar (beide verdiepingen)
-		for _, y0 in { 0, F2 } do
+		for _, y0 in levels() do
 			deco({ Name = "SconceBase", Size = Vector3.new(0.7, 1.4, 0.5), CFrame = at(t, y0 + 9, 1.45), Color = GOLD, Material = Enum.Material.Metal, Parent = folder })
 			local bulb = deco({
 				Name = "SconceBulb",
@@ -1832,18 +1909,25 @@ local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward
 				Material = Enum.Material.Neon,
 				Parent = folder,
 			})
-			if i % 2 == 0 then
+			-- In een donkere zaal branden er minder lampen en die flikkeren
+			if (currentDark and i % 4 == 0) or (not currentDark and i % 2 == 0) then
 				local light = Instance.new("PointLight")
 				light.Color = LAMP_LIGHT
 				light.Range = 18
-				light.Brightness = 1.4
+				light.Brightness = if currentDark then 0.9 else 1.4
 				light.Parent = bulb
+				if currentDark then
+					bulb:SetAttribute("Flicker", true)
+				end
+			elseif currentDark then
+				bulb.Material = Enum.Material.SmoothPlastic
+				bulb.Color = Color3.fromRGB(90, 80, 70)
 			end
 		end
 		-- Boogpaneel tussen deze en de volgende pilaar
 		if i < count - 1 then
 			local bt = t + pillarStep / 2
-			for _, y0 in { 0, F2 } do
+			for _, y0 in levels() do
 				local bayCenter = origin + along * bt + Vector3.new(0, y0, 0)
 				if not (skipBay and skipBay(bayCenter, y0)) then
 					local width = math.min(12, pillarStep - 6)
@@ -2084,7 +2168,7 @@ local function buildCabinet(parent: Model, cf: CFrame)
 	}))
 end
 
-local function buildSection(parent: Folder, section: Config.Section, index: number, slot: number): SectionData
+local function buildSection(parent: Folder, section: Config.Section, index: number, slot: number, booksPerSection: number): SectionData
 	local col = (slot - 1) % #Map.GridX + 1
 	local row = math.floor((slot - 1) / #Map.GridX) + 1
 	local floorY = if section.Floor == 1 then 0 else F2
@@ -2125,7 +2209,7 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 
 	-- Lege plekken die opvullen als je boeken terugzet
 	local slots = {}
-	local n = Config.BooksPerSection
+	local n = booksPerSection
 	local levels = { 0.3, 3.05, 5.8 }
 	local perLevel = math.ceil(n / #levels)
 	local spacing = (Map.CaseLength - 4) / perLevel
@@ -2338,10 +2422,14 @@ end
 
 local function buildLamps(parent: Folder)
 	-- Hangende kroonluchters op de begane grond
+	local ceiling = if currentFloors >= 2 then F2 - 2 else Map.WallHeight
+	local index = 0
 	for x = -100, 100, 50 do
 		for z = -60, 60, 40 do
-			local y = F2 - 4.5
-			deco({ Name = "Chain", Size = Vector3.new(0.15, 2.5, 0.15), Position = Vector3.new(x, y + 1.9, z), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
+			index += 1
+			local y = if currentFloors >= 2 then F2 - 4.5 else 30
+			local chain = ceiling - (y + 0.6)
+			deco({ Name = "Chain", Size = Vector3.new(0.15, chain, 0.15), Position = Vector3.new(x, y + 0.6 + chain / 2, z), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
 			deco({ Name = "Crown", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 3, 3), CFrame = CFrame.new(x, y + 0.6, z) * CFrame.Angles(0, 0, math.rad(90)), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
 			local lamp = deco({
 				Name = "Lamp",
@@ -2355,8 +2443,11 @@ local function buildLamps(parent: Folder)
 			local light = Instance.new("PointLight")
 			light.Color = LAMP_LIGHT
 			light.Range = 30
-			light.Brightness = 1.2
+			light.Brightness = if currentDark then 0.7 else 1.2
 			light.Parent = lamp
+			if currentDark and index % 3 == 0 then
+				lamp:SetAttribute("Flicker", true)
+			end
 		end
 	end
 end
@@ -2365,16 +2456,26 @@ local function isInsideRect(pos: Vector3, x0: number, x1: number, z0: number, z1
 	return pos.X >= x0 and pos.X <= x1 and pos.Z >= z0 and pos.Z <= z1
 end
 
-function LibraryBuilder.Build(): Library
-	local old = Workspace:FindFirstChild("Library")
-	if old then
-		old:Destroy()
-	end
+function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance): Library
+	currentFloors = room.Floors
+	currentDark = room.Dark
+	local offset = room.Offset
 
 	local model = Instance.new("Model")
-	model.Name = "Library"
+	model.Name = room.Id
+	model:SetAttribute("RoomId", room.Id)
+	model:SetAttribute("Dark", room.Dark)
 
 	buildStructure(model)
+
+	-- Deur terug naar de hal
+	local exitPrompt = Instance.new("ProximityPrompt")
+	exitPrompt.ActionText = "Terug naar de hal"
+	exitPrompt.ObjectText = "Deur"
+	exitPrompt.HoldDuration = 0.5
+	exitPrompt.MaxActivationDistance = 12
+	exitPrompt.RequiresLineOfSight = false
+	exitPrompt.Parent = model:FindFirstChild("FrontDoor", true)
 
 	local sectionsFolder = Instance.new("Folder")
 	sectionsFolder.Name = "Sections"
@@ -2382,9 +2483,10 @@ function LibraryBuilder.Build(): Library
 
 	local sections: { [string]: SectionData } = {}
 	local usedSlots = { [1] = 0, [2] = 0 }
-	for index, section in Config.Sections do
+	for _, entry in Config.RoomSections(room) do
+		local section = entry.Section
 		usedSlots[section.Floor] += 1
-		sections[section.Code] = buildSection(sectionsFolder, section, index, usedSlots[section.Floor])
+		sections[section.Code] = buildSection(sectionsFolder, section, entry.Index, usedSlots[section.Floor], room.BooksPerSection)
 	end
 
 	-- Leestafels op de overgebleven plekken in het rooster
@@ -2392,7 +2494,7 @@ function LibraryBuilder.Build(): Library
 	furniture.Name = "Furniture"
 	furniture.Parent = model
 	local slotCount = #Map.GridX * #Map.GridZ
-	for floor = 1, 2 do
+	for floor = 1, room.Floors do
 		for slot = usedSlots[floor] + 1, slotCount do
 			local col = (slot - 1) % #Map.GridX + 1
 			local row = math.floor((slot - 1) / #Map.GridX) + 1
@@ -2403,8 +2505,10 @@ function LibraryBuilder.Build(): Library
 	-- Extra tafels in de hal bij de ingang
 	buildTable(furniture, Vector3.new(-60, 0, 62))
 	buildTable(furniture, Vector3.new(60, 0, 62))
-	buildTable(furniture, Vector3.new(-60, F2, 62))
-	buildTable(furniture, Vector3.new(40, F2, 62))
+	if room.Floors >= 2 then
+		buildTable(furniture, Vector3.new(-60, F2, 62))
+		buildTable(furniture, Vector3.new(40, F2, 62))
+	end
 
 	-- Planten
 	local plantSpots = {
@@ -2424,7 +2528,9 @@ function LibraryBuilder.Build(): Library
 		Vector3.new(60, 0, -77),
 	}
 	for _, spot in plantSpots do
-		buildPlant(furniture, spot)
+		if spot.Y < 1 or room.Floors >= 2 then
+			buildPlant(furniture, spot)
+		end
 	end
 
 	local lamps = Instance.new("Folder")
@@ -2447,24 +2553,21 @@ function LibraryBuilder.Build(): Library
 		{ Vector3.new(80, F2, 77), Vector3.new(0, 0, -1) },
 	}
 	for _, spot in lockerSpots do
-		table.insert(lockers, buildLocker(lockersFolder, spot[1], spot[2]))
+		if spot[1].Y < 1 or room.Floors >= 2 then
+			local locker = buildLocker(lockersFolder, spot[1], spot[2])
+			locker.Inside += offset
+			locker.Outside += offset
+			table.insert(lockers, locker)
+		end
 	end
 
-	-- Spawnplek achter de balie (onzichtbaar, op het kleed)
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "Spawn"
-	spawn.Anchored = true
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.Size = Vector3.new(10, 1, 6)
-	spawn.Position = Vector3.new(0, -0.45, 68)
-	spawn.Transparency = 1
-	spawn.CanQuery = false
-	spawn.Parent = model
+	local books = Instance.new("Folder")
+	books.Name = "Books"
+	books.Parent = model
 
 	-- Patrouillepunten voor het monster (in de gangpaden, beide verdiepingen)
 	local waypoints = {}
-	for floor = 1, 2 do
+	for floor = 1, room.Floors do
 		local y = (if floor == 1 then 0 else F2) + 3
 		for _, x in { -108, -60, -20, 20, 60 } do
 			for _, z in { 50, 20, -10, -40, -70 } do
@@ -2472,26 +2575,52 @@ function LibraryBuilder.Build(): Library
 			end
 		end
 	end
-	table.insert(waypoints, Vector3.new(106, 3, 76))
-	table.insert(waypoints, Vector3.new(106, F2 + 3, 18))
 	table.insert(waypoints, Vector3.new(116, 3, 0))
+	if room.Floors >= 2 then
+		table.insert(waypoints, Vector3.new(106, 3, 76))
+		table.insert(waypoints, Vector3.new(106, F2 + 3, 18))
+	end
+	for i, point in waypoints do
+		waypoints[i] = point + offset
+	end
 
-	-- Pas aan het eind in Workspace zetten, dan komt alles in één keer bij de spelers aan
-	model.Parent = Workspace
-
-	local library = {
-		Model = model,
-		SpawnCFrame = CFrame.new(0, 3.5, 68),
-		Sections = sections,
-		Lockers = lockers,
-		Waypoints = waypoints,
-		KeySpots = {
+	local keySpots = if room.Floors >= 2
+		then {
 			Crimson = Vector3.new(106, 1.5, 40), -- onder de oprit
 			Golden = Vector3.new(-116, F2 + 1.5, -77), -- achterste hoek boven
 			Azure = Vector3.new(-80, 1.5, -77), -- achter de laatste kastenrij beneden
 			Emerald = Vector3.new(-40, F2 + 1.5, -58.5), -- achter het Verboden Archief
-		},
-		MonsterSpawn = Vector3.new(0, F2 + 6, -70),
+		}
+		else {
+			Crimson = Vector3.new(110, 1.5, 40),
+			Golden = Vector3.new(-118, 1.5, 20),
+			Azure = Vector3.new(-80, 1.5, -77),
+			Emerald = Vector3.new(40, 4.8, -55), -- op een leestafel
+		}
+	for id, spot in keySpots do
+		keySpots[id] = spot + offset
+	end
+	for _, section in sections do
+		section.Center += offset
+	end
+
+	-- Alles naar de plek van deze zaal schuiven en pas dan in de wereld zetten,
+	-- zodat het in één keer bij de spelers aankomt
+	model.WorldPivot = CFrame.new()
+	model:PivotTo(CFrame.new(offset))
+	model.Parent = parent
+
+	local library = {
+		Model = model,
+		Books = books,
+		Offset = offset,
+		SpawnCFrame = CFrame.new(Vector3.new(0, 3.5, 66) + offset),
+		ExitPrompt = exitPrompt,
+		Sections = sections,
+		Lockers = lockers,
+		Waypoints = waypoints,
+		KeySpots = keySpots,
+		MonsterSpawn = Vector3.new(0, (if room.Floors >= 2 then F2 else 0) + 6, -70) + offset,
 	}
 
 	local rayParams = RaycastParams.new()
@@ -2503,11 +2632,12 @@ function LibraryBuilder.Build(): Library
 			or isInsideRect(probe, -9, 9, 55, 80) -- balie en spawn
 	end
 
+	-- x en z zijn hier coördinaten binnen de zaal (zonder offset)
 	local function surfaceAt(x: number, z: number, topY: number, params: RaycastParams): CFrame?
 		if blockedSpot(Vector3.new(x, 0, z)) then
 			return nil
 		end
-		local result = Workspace:Raycast(Vector3.new(x, topY, z), Vector3.new(0, -30, 0), params)
+		local result = Workspace:Raycast(Vector3.new(x, topY, z) + offset, Vector3.new(0, -30, 0), params)
 		if not result then
 			return nil
 		end
@@ -2523,7 +2653,7 @@ function LibraryBuilder.Build(): Library
 	-- Geeft de CFrame van het oppervlak terug (het boek zet zichzelf erop).
 	function library.RandomBookSpot(_self: Library): CFrame
 		for _ = 1, 60 do
-			local floor = math.random(1, 2)
+			local floor = math.random(1, room.Floors)
 			local x = math.random(-Map.HalfX + 3, Map.HalfX - 3) + math.random()
 			local z = math.random(-Map.HalfZ + 3, Map.HalfZ - 3) + math.random()
 			local topY = if floor == 1 then F2 - 3 else Map.WallHeight - 4
@@ -2532,7 +2662,7 @@ function LibraryBuilder.Build(): Library
 				return spot
 			end
 		end
-		return CFrame.new(0, 0, 50)
+		return CFrame.new(Vector3.new(0, 0, 50) + offset)
 	end
 
 	-- Plek in de buurt van een punt; met `extra` (bijv. de map met boeken) erbij
@@ -2541,13 +2671,14 @@ function LibraryBuilder.Build(): Library
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = if extra then { model, extra } else { model }
-		local floorY = if center.Y >= F2 - 1 then F2 else 0
+		local localCenter = center - offset
+		local floorY = if localCenter.Y >= F2 - 1 then F2 else 0
 		local topY = if floorY == 0 then F2 - 3 else Map.WallHeight - 4
 		for _ = 1, 12 do
 			local angle = math.random() * math.pi * 2
 			local r = math.sqrt(math.random()) * radius
-			local spot = surfaceAt(center.X + math.cos(angle) * r, center.Z + math.sin(angle) * r, topY, params)
-			if spot and spot.Position.Y < floorY + 6 then
+			local spot = surfaceAt(localCenter.X + math.cos(angle) * r, localCenter.Z + math.sin(angle) * r, topY, params)
+			if spot and spot.Position.Y - offset.Y < floorY + 6 then
 				return spot
 			end
 		end
@@ -2563,11 +2694,614 @@ return LibraryBuilder
       </Item>
       <Item class="ModuleScript" referent="12">
         <Properties>
+          <string name="Name">LobbyBuilder</string>
+          <string name="Source"><![CDATA[-- Bouwt de hal waar je begint: blauwe muren met boogramen, een paars gewelf
+-- met houten ribben en een kroonluchter, een reuzenboek als kleed, en
+-- achterin een deur met een gloeiende portaalring voor elke zaal.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+
+local LobbyBuilder = {}
+
+export type Door = {
+	Room: Config.RoomInfo,
+	Prompt: ProximityPrompt,
+	Zone: BasePart,
+	Info: TextLabel,
+}
+
+export type Lobby = {
+	Model: Model,
+	SpawnCFrame: CFrame,
+	Doors: { [string]: Door },
+}
+
+local HX, HZ = 70, 50 -- halve breedte en diepte
+local WALL_H = 26 -- hoogte van de zijmuren
+local RIDGE_H = 44 -- hoogte van de nok
+
+local WALL = Color3.fromRGB(72, 94, 128)
+local WAINSCOT = Color3.fromRGB(110, 58, 34)
+local TRIM = Color3.fromRGB(214, 128, 66)
+local CEILING = Color3.fromRGB(96, 78, 176)
+local RIB = Color3.fromRGB(196, 110, 58)
+local FLOOR = Color3.fromRGB(182, 92, 44)
+local GOLD = Color3.fromRGB(230, 186, 96)
+local CREAM = Color3.fromRGB(240, 226, 196)
+
+local function part(props: { [string]: any }): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Material = Enum.Material.SmoothPlastic
+	if props.Shape then
+		p.Shape = props.Shape
+	end
+	for key, value in props do
+		if key ~= "Parent" and key ~= "Shape" then
+			(p :: any)[key] = value
+		end
+	end
+	p.Parent = props.Parent
+	return p
+end
+
+local function deco(props: { [string]: any }): Part
+	props.CanCollide = false
+	props.CanQuery = false
+	props.CanTouch = false
+	return part(props)
+end
+
+-- Grote tekst met een rand, zoals de borden in het origineel
+local function signText(p: BasePart, face: Enum.NormalId, text: string, color: Color3, font: Enum.Font?): TextLabel
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = face
+	gui.LightInfluence = 0
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.Parent = p
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = font or Enum.Font.LuckiestGuy
+	label.TextScaled = true
+	label.TextColor3 = color
+	label.Text = text
+	label.Parent = gui
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(25, 20, 40)
+	stroke.Thickness = 4
+	stroke.Parent = label
+	return label
+end
+
+local function buildShell(folder: Folder)
+	part({
+		Name = "Floor",
+		Size = Vector3.new(HX * 2, 2, HZ * 2),
+		Position = Vector3.new(0, -1, 0),
+		Color = FLOOR,
+		Material = Enum.Material.WoodPlanks,
+		Parent = folder,
+	})
+
+	-- Zijmuren (met ramen) en voor-/achtermuur tot aan de nok
+	for _, side in { -1, 1 } do
+		part({
+			Name = "SideWall",
+			Size = Vector3.new(2, WALL_H + 2, HZ * 2 + 4),
+			Position = Vector3.new(side * (HX + 1), WALL_H / 2 - 1, 0),
+			Color = WALL,
+			Material = Enum.Material.Plaster,
+			Parent = folder,
+		})
+		part({
+			Name = "EndWall",
+			Size = Vector3.new(HX * 2 + 4, RIDGE_H + 4, 2),
+			Position = Vector3.new(0, RIDGE_H / 2, side * (HZ + 1)),
+			Color = WALL,
+			Material = Enum.Material.Plaster,
+			Parent = folder,
+		})
+	end
+
+	-- Lambrisering en lijsten langs alle muren
+	local runs = {
+		{ Vector3.new(HX * 2, 0, 0), Vector3.new(0, 0, HZ - 0.3), Vector3.new(1, 0, 0) },
+		{ Vector3.new(HX * 2, 0, 0), Vector3.new(0, 0, -HZ + 0.3), Vector3.new(1, 0, 0) },
+		{ Vector3.new(0, 0, HZ * 2), Vector3.new(HX - 0.3, 0, 0), Vector3.new(0, 0, 1) },
+		{ Vector3.new(0, 0, HZ * 2), Vector3.new(-HX + 0.3, 0, 0), Vector3.new(0, 0, 1) },
+	}
+	for _, run in runs do
+		local length = run[1].Magnitude
+		local alongX = run[3].X ~= 0
+		local function band(name: string, height: number, y: number, depth: number, color: Color3)
+			deco({
+				Name = name,
+				Size = if alongX then Vector3.new(length, height, depth) else Vector3.new(depth, height, length),
+				Position = run[2] + Vector3.new(0, y, 0),
+				Color = color,
+				Material = Enum.Material.Wood,
+				Parent = folder,
+			})
+		end
+		band("Wainscot", 4, 2, 0.6, WAINSCOT)
+		band("ChairRail", 0.5, 4.2, 0.9, TRIM)
+		band("Crown", 1.4, WALL_H - 0.7, 1.2, TRIM)
+	end
+
+	-- Gewelf: twee schuine helften met de nok in het midden (langs Z)
+	local rise = RIDGE_H - WALL_H
+	local slopeLength = math.sqrt(HX * HX + rise * rise)
+	local angle = math.atan2(rise, HX)
+	for _, side in { -1, 1 } do
+		local center = Vector3.new(side * HX / 2, WALL_H + rise / 2, 0)
+		local tilt = CFrame.new(center) * CFrame.Angles(0, 0, side * -angle)
+		part({
+			Name = "Vault",
+			Size = Vector3.new(slopeLength + 2, 1, HZ * 2 + 2),
+			CFrame = tilt * CFrame.new(0, 0.5, 0),
+			Color = CEILING,
+			Material = Enum.Material.Plaster,
+			Parent = folder,
+		})
+		-- Houten ribben over het gewelf
+		for z = -HZ + 5, HZ - 5, 12.5 do
+			deco({
+				Name = "Rib",
+				Size = Vector3.new(slopeLength, 1.2, 1.4),
+				CFrame = tilt * CFrame.new(0, -0.6, z),
+				Color = RIB,
+				Material = Enum.Material.Wood,
+				Parent = folder,
+			})
+		end
+		-- Schuine kruisribben
+		for _, dir in { -1, 1 } do
+			local a = Vector3.new(side * HX, WALL_H, dir * HZ)
+			local b = Vector3.new(0, RIDGE_H - 0.6, 0)
+			local mid = (a + b) / 2
+			deco({
+				Name = "CrossRib",
+				Size = Vector3.new(1, 1, (b - a).Magnitude),
+				CFrame = CFrame.lookAt(mid, b) * CFrame.new(0, -1.2, 0),
+				Color = RIB,
+				Material = Enum.Material.Wood,
+				Parent = folder,
+			})
+		end
+	end
+	deco({ Name = "Ridge", Size = Vector3.new(2, 1.5, HZ * 2), Position = Vector3.new(0, RIDGE_H - 0.6, 0), Color = RIB, Material = Enum.Material.Wood, Parent = folder })
+end
+
+-- Hoog boograam met een raamkruis
+local function buildWindow(folder: Folder, x: number, z: number)
+	local side = math.sign(x)
+	local face = x - side * 0.1
+	local function at(y: number, depth: number): CFrame
+		return CFrame.new(face - side * depth, y, z) * CFrame.Angles(0, math.rad(90), 0)
+	end
+	local width, top = 8, 18
+	deco({ Name = "WindowFrame", Size = Vector3.new(width + 1.6, top - 5 + 0.8, 0.3), CFrame = at((5 + top) / 2, 0.05), Color = GOLD, Material = Enum.Material.Wood, Parent = folder })
+	deco({
+		Name = "WindowFrameTop",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, width + 1.6, width + 1.6),
+		CFrame = at(top, 0.05) * CFrame.Angles(0, math.rad(90), 0),
+		Color = GOLD,
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	deco({
+		Name = "Glass",
+		Size = Vector3.new(width, top - 5, 0.2),
+		CFrame = at((5 + top) / 2, 0.2),
+		Color = Color3.fromRGB(170, 215, 255),
+		Material = Enum.Material.Neon,
+		Transparency = 0.25,
+		Parent = folder,
+	})
+	deco({
+		Name = "GlassTop",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.2, width, width),
+		CFrame = at(top, 0.2) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(170, 215, 255),
+		Material = Enum.Material.Neon,
+		Transparency = 0.25,
+		Parent = folder,
+	})
+	-- Raamkruis en waaier bovenin
+	deco({ Name = "Mullion", Size = Vector3.new(0.4, top - 5 + width / 2, 0.2), CFrame = at((5 + top + width / 2) / 2, 0.35), Color = CREAM, Parent = folder })
+	for _, y in { 9, 13.5 } do
+		deco({ Name = "Transom", Size = Vector3.new(width, 0.4, 0.2), CFrame = at(y, 0.35), Color = CREAM, Parent = folder })
+	end
+	for i = -2, 2 do
+		deco({
+			Name = "Fan",
+			Size = Vector3.new(0.3, width / 2, 0.2),
+			CFrame = at(top, 0.35) * CFrame.Angles(0, 0, math.rad(i * 30)) * CFrame.new(0, width / 4, 0),
+			Color = CREAM,
+			Parent = folder,
+		})
+	end
+end
+
+local function buildChandelier(folder: Folder, position: Vector3)
+	local chain = RIDGE_H - 1 - (position.Y + 1)
+	deco({ Name = "Chain", Size = Vector3.new(0.2, chain, 0.2), Position = position + Vector3.new(0, 1 + chain / 2, 0), Color = GOLD, Material = Enum.Material.Metal, Parent = folder })
+	deco({ Name = "Stem", Size = Vector3.new(0.8, 3, 0.8), Position = position, Color = CREAM, Material = Enum.Material.Metal, Parent = folder })
+	deco({
+		Name = "Ring",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.4, 7, 7),
+		CFrame = CFrame.new(position - Vector3.new(0, 1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = CREAM,
+		Material = Enum.Material.Metal,
+		Parent = folder,
+	})
+	for i = 1, 8 do
+		local a = math.rad(i * 45)
+		local p = position + Vector3.new(math.cos(a) * 3.4, -0.2, math.sin(a) * 3.4)
+		deco({ Name = "Candle", Size = Vector3.new(0.35, 1.2, 0.35), Position = p, Color = Color3.fromRGB(250, 245, 230), Parent = folder })
+		deco({
+			Name = "Flame",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.4, 0.4, 0.4),
+			Position = p + Vector3.new(0, 0.8, 0),
+			Color = Color3.fromRGB(255, 210, 120),
+			Material = Enum.Material.Neon,
+			Parent = folder,
+		})
+	end
+	local glow = deco({ Name = "Glow", Size = Vector3.new(1, 1, 1), Position = position - Vector3.new(0, 1.5, 0), Transparency = 1, Parent = folder })
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 220, 170)
+	light.Range = 50
+	light.Brightness = 1.8
+	light.Shadows = true
+	light.Parent = glow
+end
+
+-- Schilderij boven de deuren
+local function buildPainting(folder: Folder)
+	local frame = deco({
+		Name = "PaintingFrame",
+		Size = Vector3.new(46, 11, 0.4),
+		Position = Vector3.new(0, 35, -HZ + 0.3),
+		Color = GOLD,
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	local canvas = deco({
+		Name = "Painting",
+		Size = Vector3.new(44, 9, 0.2),
+		Position = Vector3.new(0, 35, -HZ + 0.55),
+		Color = Color3.new(1, 1, 1),
+		Parent = folder,
+	})
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Back
+	gui.LightInfluence = 0.3
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 20
+	gui.Parent = canvas
+	local sky = Instance.new("Frame")
+	sky.Size = UDim2.fromScale(1, 1)
+	sky.BorderSizePixel = 0
+	sky.BackgroundColor3 = Color3.new(1, 1, 1)
+	sky.Parent = gui
+	local gradient = Instance.new("UIGradient")
+	gradient.Rotation = 90
+	gradient.Color = ColorSequence.new(Color3.fromRGB(120, 150, 210), Color3.fromRGB(240, 196, 200))
+	gradient.Parent = sky
+	-- Heuvels en een kasteel als silhouet
+	local function shape(x: number, y: number, w: number, h: number, color: Color3, rotation: number?)
+		local f = Instance.new("Frame")
+		f.AnchorPoint = Vector2.new(0.5, 0.5)
+		f.Position = UDim2.fromScale(x, y)
+		f.Size = UDim2.fromScale(w, h)
+		f.BackgroundColor3 = color
+		f.BorderSizePixel = 0
+		f.Rotation = rotation or 0
+		f.Parent = sky
+		return f
+	end
+	local hill = Color3.fromRGB(80, 90, 110)
+	shape(0.2, 0.95, 0.6, 0.5, hill, 8)
+	shape(0.75, 0.98, 0.7, 0.5, Color3.fromRGB(70, 80, 100), -6)
+	shape(0.62, 0.62, 0.05, 0.3, Color3.fromRGB(60, 62, 80))
+	shape(0.7, 0.58, 0.06, 0.38, Color3.fromRGB(60, 62, 80))
+	shape(0.78, 0.64, 0.05, 0.26, Color3.fromRGB(60, 62, 80))
+	shape(0.7, 0.72, 0.2, 0.2, Color3.fromRGB(60, 62, 80))
+	local sun = shape(0.22, 0.3, 0.07, 0.3, Color3.fromRGB(255, 236, 190))
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(1, 0)
+	c.Parent = sun
+	return frame
+end
+
+-- Reuzenboek als kleed in het midden
+local function buildBigBook(folder: Folder)
+	local center = Vector3.new(0, 0, 8)
+	-- Laag gehouden zodat je er gewoon overheen loopt
+	deco({ Name = "BigBookPages", Size = Vector3.new(33, 0.3, 23.4), Position = center + Vector3.new(0.6, 0.15, 0), Color = CREAM, Parent = folder })
+	local cover = part({
+		Name = "BigBookCover",
+		Size = Vector3.new(34, 0.15, 24),
+		Position = center + Vector3.new(0, 0.37, 0),
+		Color = Color3.fromRGB(40, 104, 80),
+		Material = Enum.Material.Fabric,
+		Parent = folder,
+	})
+	deco({ Name = "BigBookSpine", Size = Vector3.new(2, 0.2, 24), Position = center + Vector3.new(-16.5, 0.4, 0), Color = Color3.fromRGB(28, 80, 60), Material = Enum.Material.Fabric, Parent = folder })
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Top
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 20
+	gui.Parent = cover
+	for _, y in { 0.1, 0.86 } do
+		local band = Instance.new("Frame")
+		band.Position = UDim2.fromScale(0.08, y)
+		band.Size = UDim2.fromScale(0.84, 0.03)
+		band.BorderSizePixel = 0
+		band.BackgroundColor3 = GOLD
+		band.Parent = gui
+	end
+	local title = Instance.new("TextLabel")
+	title.Position = UDim2.fromScale(0.1, 0.2)
+	title.Size = UDim2.fromScale(0.8, 0.6)
+	title.BackgroundTransparency = 1
+	title.Font = Enum.Font.Garamond
+	title.TextScaled = true
+	title.TextColor3 = GOLD
+	title.Text = "Clean The\nLibrary"
+	title.Parent = gui
+end
+
+local function buildPlant(folder: Folder, position: Vector3)
+	part({
+		Name = "Vase",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(3.2, 2.2, 2.2),
+		CFrame = CFrame.new(position + Vector3.new(0, 1.6, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(160, 178, 112),
+		Material = Enum.Material.Marble,
+		Parent = folder,
+	})
+	for i = 1, 9 do
+		local len = math.random(35, 55) / 10
+		deco({
+			Name = "Leaf",
+			Size = Vector3.new(0.8, len, 0.12),
+			CFrame = CFrame.new(position + Vector3.new(0, 3.2, 0))
+				* CFrame.Angles(0, math.rad(i * 40), 0)
+				* CFrame.Angles(math.rad(math.random(15, 40)), 0, 0)
+				* CFrame.new(0, len / 2, 0),
+			Color = if i % 2 == 0 then Color3.fromRGB(70, 150, 70) else Color3.fromRGB(110, 175, 80),
+			Parent = folder,
+		})
+	end
+end
+
+-- Kraam met een zwevend bord (Winkel / Magie). De prompt opent het venster op de client.
+local function buildStand(folder: Folder, position: Vector3, facing: Vector3, title: string, color: Color3, panel: string)
+	local base = CFrame.lookAt(position, position + facing)
+	local counter = part({
+		Name = "Stand",
+		Size = Vector3.new(12, 3.5, 4),
+		CFrame = base * CFrame.new(0, 1.75, 0),
+		Color = TRIM,
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	deco({ Name = "StandTop", Size = Vector3.new(12.6, 0.4, 4.6), CFrame = base * CFrame.new(0, 3.7, 0), Color = color, Parent = folder })
+	local sign = deco({ Name = "StandSign", Size = Vector3.new(14, 4, 0.2), CFrame = base * CFrame.new(0, 10, 0), Transparency = 1, Parent = folder })
+	signText(sign, Enum.NormalId.Front, title, color)
+	signText(sign, Enum.NormalId.Back, title, color)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Openen"
+	prompt.ObjectText = title
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("OpenPanel", panel)
+	prompt.Parent = counter
+end
+
+local function buildDoor(folder: Folder, room: Config.RoomInfo, x: number): Door
+	local z = -HZ
+	local base = CFrame.new(x, 0, z + 0.4) -- voorkant (naar de hal) is +Z
+	local doorW, doorH = 11, 15
+	-- Gloeiende rand in de kleur van de zaal
+	deco({
+		Name = "DoorGlow",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.2, doorW + 3, doorW + 3),
+		CFrame = base * CFrame.new(0, doorH, 0.05) * CFrame.Angles(0, math.rad(90), 0),
+		Color = room.Color,
+		Material = Enum.Material.Neon,
+		Parent = folder,
+	})
+	deco({ Name = "DoorGlowRect", Size = Vector3.new(doorW + 3, doorH, 0.2), CFrame = base * CFrame.new(0, doorH / 2, 0.05), Color = room.Color, Material = Enum.Material.Neon, Parent = folder })
+	-- Houten kozijn
+	deco({
+		Name = "DoorFrameTop",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, doorW + 1.6, doorW + 1.6),
+		CFrame = base * CFrame.new(0, doorH, 0.2) * CFrame.Angles(0, math.rad(90), 0),
+		Color = TRIM,
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	deco({ Name = "DoorFrame", Size = Vector3.new(doorW + 1.6, doorH, 0.3), CFrame = base * CFrame.new(0, doorH / 2, 0.2), Color = TRIM, Material = Enum.Material.Wood, Parent = folder })
+	-- De deur zelf (twee deurvleugels)
+	local door = part({
+		Name = "Door",
+		Size = Vector3.new(doorW, doorH, 0.4),
+		CFrame = base * CFrame.new(0, doorH / 2, 0.45),
+		Color = Color3.fromRGB(90, 46, 26),
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	deco({
+		Name = "DoorTop",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.4, doorW, doorW),
+		CFrame = base * CFrame.new(0, doorH, 0.45) * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(90, 46, 26),
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	deco({ Name = "DoorSplit", Size = Vector3.new(0.2, doorH + doorW / 2, 0.1), CFrame = base * CFrame.new(0, (doorH + doorW / 2) / 2, 0.7), Color = Color3.fromRGB(50, 24, 14), Parent = folder })
+	for _, side in { -1, 1 } do
+		deco({
+			Name = "Knob",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.6, 0.6, 0.6),
+			CFrame = base * CFrame.new(side * 1, 7, 0.8),
+			Color = GOLD,
+			Material = Enum.Material.Metal,
+			Parent = folder,
+		})
+	end
+
+	-- Bord met de naam en een regel met live informatie
+	local sign = deco({ Name = "DoorSign", Size = Vector3.new(30, 5, 0.2), CFrame = base * CFrame.new(0, 26, 0.3), Transparency = 1, Parent = folder })
+	signText(sign, Enum.NormalId.Back, room.Name, room.Color)
+	local infoPart = deco({ Name = "DoorInfo", Size = Vector3.new(30, 4.2, 0.2), CFrame = base * CFrame.new(0, 22, 0.3), Transparency = 1, Parent = folder })
+	local description = signText(infoPart, Enum.NormalId.Back, room.Description, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+	description.Size = UDim2.fromScale(1, 0.45)
+	local info = signText(infoPart, Enum.NormalId.Back, "", Color3.fromRGB(255, 240, 160), Enum.Font.GothamBlack)
+	info.Size = UDim2.fromScale(1, 0.45)
+	info.Position = UDim2.fromScale(0, 0.52)
+
+	-- Portaalring op de vloer: erin stappen = naar binnen
+	local ringCenter = Vector3.new(x, 0, z + 10)
+	deco({
+		Name = "PortalRing",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.12, 11, 11),
+		CFrame = CFrame.new(ringCenter + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = room.Color,
+		Material = Enum.Material.Neon,
+		Transparency = 0.15,
+		Parent = folder,
+	})
+	deco({
+		Name = "PortalInner",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.14, 9, 9),
+		CFrame = CFrame.new(ringCenter + Vector3.new(0, 0.07, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = room.Color,
+		Material = Enum.Material.Glass,
+		Transparency = 0.55,
+		Parent = folder,
+	})
+	local zone = part({
+		Name = "PortalZone",
+		Size = Vector3.new(9, 6, 9),
+		Position = ringCenter + Vector3.new(0, 3, 0),
+		Transparency = 1,
+		CanCollide = false,
+		CanQuery = false,
+		Parent = folder,
+	})
+	zone:SetAttribute("RoomId", room.Id)
+	local particles = Instance.new("ParticleEmitter")
+	particles.Color = ColorSequence.new(room.Color)
+	particles.LightEmission = 1
+	particles.Size = NumberSequence.new(0.5, 0)
+	particles.Lifetime = NumberRange.new(1, 2)
+	particles.Rate = 25
+	particles.Speed = NumberRange.new(3, 6)
+	particles.SpreadAngle = Vector2.new(15, 15)
+	particles.EmissionDirection = Enum.NormalId.Top
+	particles.Parent = zone
+	local light = Instance.new("PointLight")
+	light.Color = room.Color
+	light.Range = 14
+	light.Brightness = 1.5
+	light.Parent = zone
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Naar binnen"
+	prompt.ObjectText = room.Name
+	prompt.HoldDuration = 0.2
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = door
+
+	return { Room = room, Prompt = prompt, Zone = zone, Info = info }
+end
+
+function LobbyBuilder.Build(parent: Instance): Lobby
+	local model = Instance.new("Model")
+	model.Name = "Lobby"
+	local folder = Instance.new("Folder")
+	folder.Name = "Structure"
+	folder.Parent = model
+
+	buildShell(folder)
+	for _, side in { -1, 1 } do
+		for _, z in { -30, -10, 10, 30 } do
+			buildWindow(folder, side * HX, z)
+		end
+	end
+	buildChandelier(folder, Vector3.new(0, 30, 8))
+	buildPainting(folder)
+	buildBigBook(folder)
+	for _, spot in { Vector3.new(-64, 0, 44), Vector3.new(64, 0, 44), Vector3.new(-64, 0, -44), Vector3.new(64, 0, -44), Vector3.new(-20, 0, -46), Vector3.new(20, 0, -46) } do
+		buildPlant(folder, spot)
+	end
+
+	buildStand(folder, Vector3.new(-58, 0, 12), Vector3.new(1, 0, 0), "WINKEL", Color3.fromRGB(255, 110, 200), "Shop")
+	buildStand(folder, Vector3.new(58, 0, 12), Vector3.new(-1, 0, 0), "MAGIE", Color3.fromRGB(110, 190, 255), "Magic")
+
+	-- Welkomstbord boven de ingang
+	local welcome = deco({ Name = "Welcome", Size = Vector3.new(40, 6, 0.2), Position = Vector3.new(0, 20, HZ - 0.3), Transparency = 1, Parent = folder })
+	signText(welcome, Enum.NormalId.Front, "Kies een zaal!", Color3.fromRGB(255, 220, 120))
+
+	local doors = {}
+	local count = #Config.Rooms
+	for i, room in Config.Rooms do
+		local x = (i - (count + 1) / 2) * 40
+		doors[room.Id] = buildDoor(folder, room, x)
+	end
+
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "Spawn"
+	spawn.Anchored = true
+	spawn.Neutral = true
+	spawn.Duration = 0
+	spawn.Size = Vector3.new(12, 1, 8)
+	spawn.Position = Vector3.new(0, -0.45, 36)
+	spawn.Transparency = 1
+	spawn.CanQuery = false
+	spawn.Parent = model
+
+	model.Parent = parent
+	return {
+		Model = model,
+		SpawnCFrame = CFrame.new(0, 3.5, 36),
+		Doors = doors,
+	}
+end
+
+return LobbyBuilder
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="13">
+        <Properties>
           <string name="Name">MonsterService</string>
           <string name="Source"><![CDATA[-- "De Bibliothecaresse": het monster dat door de donkere bibliotheek sluipt.
 -- Ze patrouilleert, hoort sprintende spelers en fouten, en jaagt op wie ze ziet.
 
-local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -2577,710 +3311,986 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local M = Config.Monster
 
+export type Monster = {
+	OnCatch: ((player: Player) -> ())?,
+	OnHiddenCatch: ((player: Player) -> ())?,
+	Progress: number, -- 0..1, hoe ver de spelers zijn
+	Spawn: () -> (),
+	Despawn: () -> (),
+	Noise: (position: Vector3, range: number) -> (),
+}
+
 local MonsterService = {}
-MonsterService.OnCatch = nil :: ((player: Player) -> ())?
-MonsterService.OnHiddenCatch = nil :: ((player: Player) -> ())?
-MonsterService.Progress = 0 -- 0..1, hoe ver de spelers zijn
 
-local library
-local model: Model? = nil
-local humanoid: Humanoid? = nil
-local root: BasePart? = nil
-local head: BasePart? = nil
-local shushLabel: TextLabel? = nil
-local running = false
-local loopId = 0
+-- Maakt het monster voor één zaal. `getPlayers` geeft de spelers in die zaal.
+function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { Player }): Monster
+	local self = {
+		OnCatch = nil,
+		OnHiddenCatch = nil,
+		Progress = 0,
+	} :: any
 
--- Toestand van de AI
-local state = "Wander" -- Wander | Investigate | Chase | Pause
-local target: Player? = nil
-local lastSeen = 0
-local lastKnown: Vector3? = nil
-local goal: Vector3? = nil
-local waypoints: { PathWaypoint } = {}
-local wpIndex = 1
-local lastPathTime = 0
-local idleUntil = 0
-local stuckCheckPos = Vector3.zero
-local stuckCheckTime = 0
-local sawHide = false
-local hideChaseStart = 0
-local pendingNoise: Vector3? = nil
+	local model: Model? = nil
+	local humanoid: Humanoid? = nil
+	local root: BasePart? = nil
+	local head: BasePart? = nil
+	local shushLabel: TextLabel? = nil
+	local running = false
+	local loopId = 0
 
-local path = PathfindingService:CreatePath({
-	AgentRadius = 2.5,
-	AgentHeight = 10,
-	AgentCanJump = false,
-	WaypointSpacing = 6,
-})
+	-- Toestand van de AI
+	local state = "Wander" -- Wander | Investigate | Chase | Pause
+	local target: Player? = nil
+	local lastSeen = 0
+	local lastKnown: Vector3? = nil
+	local goal: Vector3? = nil
+	local waypoints: { PathWaypoint } = {}
+	local wpIndex = 1
+	local lastPathTime = 0
+	local idleUntil = 0
+	local stuckCheckPos = Vector3.zero
+	local stuckCheckTime = 0
+	local sawHide = false
+	local hideChaseStart = 0
+	local pendingNoise: Vector3? = nil
 
-local function weldPart(parent: Model, rootPart: BasePart, props: { [string]: any }): Part
-	local p = Instance.new("Part")
-	p.Anchored = false
-	p.CanCollide = false
-	p.Massless = true
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Material = Enum.Material.SmoothPlastic
-	local offset: CFrame = props.Offset
-	for key, value in props do
-		if key ~= "Offset" then
-			(p :: any)[key] = value
+	local path = PathfindingService:CreatePath({
+		AgentRadius = 2.5,
+		AgentHeight = 10,
+		AgentCanJump = false,
+		WaypointSpacing = 6,
+	})
+
+	local function weldPart(parent: Model, rootPart: BasePart, props: { [string]: any }): Part
+		local p = Instance.new("Part")
+		p.Anchored = false
+		p.CanCollide = false
+		p.Massless = true
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Material = Enum.Material.SmoothPlastic
+		local offset: CFrame = props.Offset
+		for key, value in props do
+			if key ~= "Offset" then
+				(p :: any)[key] = value
+			end
 		end
+		p.CFrame = rootPart.CFrame * offset
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = rootPart
+		weld.Part1 = p
+		weld.Parent = p
+		p.Parent = parent
+		return p
 	end
-	p.CFrame = rootPart.CFrame * offset
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = rootPart
-	weld.Part1 = p
-	weld.Parent = p
-	p.Parent = parent
-	return p
-end
 
-local function buildModel(position: Vector3): Model
-	local m = Instance.new("Model")
-	m.Name = M.Name
+	local function buildModel(position: Vector3): Model
+		local m = Instance.new("Model")
+		m.Name = M.Name
 
-	local hrp = Instance.new("Part")
-	hrp.Name = "HumanoidRootPart"
-	hrp.Size = Vector3.new(2, 2, 1)
-	hrp.Transparency = 1
-	hrp.CanCollide = false
-	hrp.CFrame = CFrame.new(position)
-	hrp.Parent = m
-	m.PrimaryPart = hrp
+		local hrp = Instance.new("Part")
+		hrp.Name = "HumanoidRootPart"
+		hrp.Size = Vector3.new(2, 2, 1)
+		hrp.Transparency = 1
+		hrp.CanCollide = false
+		hrp.CFrame = CFrame.new(position)
+		hrp.Parent = m
+		m.PrimaryPart = hrp
 
-	local black = Color3.fromRGB(15, 12, 18)
-	local skin = Color3.fromRGB(205, 200, 190)
+		local black = Color3.fromRGB(15, 12, 18)
+		local skin = Color3.fromRGB(205, 200, 190)
 
-	-- Lang zwart gewaad
-	weldPart(m, hrp, {
-		Name = "Torso",
-		Size = Vector3.new(3, 3.5, 1.4),
-		Color = black,
-		Material = Enum.Material.Fabric,
-		CanCollide = true,
-		Massless = false,
-		Offset = CFrame.new(0, 1.25, 0),
-	})
-	weldPart(m, hrp, {
-		Name = "Robe",
-		Size = Vector3.new(3.4, 4.6, 1.8),
-		Color = black,
-		Material = Enum.Material.Fabric,
-		Offset = CFrame.new(0, -2.6, 0),
-	})
-	-- Veel te lange armen
-	for _, side in { -1, 1 } do
+		-- Lang zwart gewaad
 		weldPart(m, hrp, {
-			Name = "Arm",
-			Size = Vector3.new(0.6, 6.5, 0.6),
+			Name = "Torso",
+			Size = Vector3.new(3, 3.5, 1.4),
 			Color = black,
 			Material = Enum.Material.Fabric,
-			Offset = CFrame.new(side * 1.85, 0, -0.2) * CFrame.Angles(math.rad(-12), 0, math.rad(side * 6)),
+			CanCollide = true,
+			Massless = false,
+			Offset = CFrame.new(0, 1.25, 0),
 		})
 		weldPart(m, hrp, {
-			Name = "Hand",
-			Size = Vector3.new(0.7, 1.2, 0.3),
+			Name = "Robe",
+			Size = Vector3.new(3.4, 4.6, 1.8),
+			Color = black,
+			Material = Enum.Material.Fabric,
+			Offset = CFrame.new(0, -2.6, 0),
+		})
+		-- Veel te lange armen
+		for _, side in { -1, 1 } do
+			weldPart(m, hrp, {
+				Name = "Arm",
+				Size = Vector3.new(0.6, 6.5, 0.6),
+				Color = black,
+				Material = Enum.Material.Fabric,
+				Offset = CFrame.new(side * 1.85, 0, -0.2) * CFrame.Angles(math.rad(-12), 0, math.rad(side * 6)),
+			})
+			weldPart(m, hrp, {
+				Name = "Hand",
+				Size = Vector3.new(0.7, 1.2, 0.3),
+				Color = skin,
+				Offset = CFrame.new(side * 2.1, -3.4, -0.9),
+			})
+		end
+		local headPart = weldPart(m, hrp, {
+			Name = "Head",
+			Size = Vector3.new(1.8, 2.1, 1.8),
 			Color = skin,
-			Offset = CFrame.new(side * 2.1, -3.4, -0.9),
+			CanCollide = true,
+			Massless = false,
+			Offset = CFrame.new(0, 4.05, 0),
 		})
-	end
-	local headPart = weldPart(m, hrp, {
-		Name = "Head",
-		Size = Vector3.new(1.8, 2.1, 1.8),
-		Color = skin,
-		CanCollide = true,
-		Massless = false,
-		Offset = CFrame.new(0, 4.05, 0),
-	})
-	-- Haarknot
-	weldPart(m, hrp, {
-		Name = "Bun",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(1.4, 1.4, 1.4),
-		Color = Color3.fromRGB(60, 60, 64),
-		Offset = CFrame.new(0, 5.3, 0.5),
-	})
-	-- Gloeiende ogen en een bril
-	for _, side in { -1, 1 } do
+		-- Haarknot
 		weldPart(m, hrp, {
-			Name = "Eye",
-			Size = Vector3.new(0.4, 0.28, 0.1),
-			Color = Color3.fromRGB(255, 20, 20),
-			Material = Enum.Material.Neon,
-			Offset = CFrame.new(side * 0.42, 4.25, -0.92),
+			Name = "Bun",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1.4, 1.4, 1.4),
+			Color = Color3.fromRGB(60, 60, 64),
+			Offset = CFrame.new(0, 5.3, 0.5),
 		})
+		-- Gloeiende ogen en een bril
+		for _, side in { -1, 1 } do
+			weldPart(m, hrp, {
+				Name = "Eye",
+				Size = Vector3.new(0.4, 0.28, 0.1),
+				Color = Color3.fromRGB(255, 20, 20),
+				Material = Enum.Material.Neon,
+				Offset = CFrame.new(side * 0.42, 4.25, -0.92),
+			})
+			weldPart(m, hrp, {
+				Name = "Glasses",
+				Size = Vector3.new(0.65, 0.5, 0.05),
+				Color = Color3.fromRGB(20, 20, 20),
+				Transparency = 0.3,
+				Offset = CFrame.new(side * 0.42, 4.25, -0.97),
+			})
+		end
 		weldPart(m, hrp, {
-			Name = "Glasses",
-			Size = Vector3.new(0.65, 0.5, 0.05),
-			Color = Color3.fromRGB(20, 20, 20),
-			Transparency = 0.3,
-			Offset = CFrame.new(side * 0.42, 4.25, -0.97),
+			Name = "Mouth",
+			Size = Vector3.new(0.9, 0.12, 0.05),
+			Color = Color3.new(0, 0, 0),
+			Offset = CFrame.new(0, 3.55, -0.92),
 		})
+
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(255, 40, 40)
+		glow.Range = 14
+		glow.Brightness = 2
+		glow.Parent = headPart
+
+		local billboard = Instance.new("BillboardGui")
+		billboard.Size = UDim2.fromOffset(220, 60)
+		billboard.StudsOffset = Vector3.new(0, 3, 0)
+		billboard.AlwaysOnTop = false
+		billboard.MaxDistance = 80
+		billboard.Parent = headPart
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Text = ""
+		label.TextScaled = true
+		label.Font = Enum.Font.Creepster
+		label.TextColor3 = Color3.fromRGB(255, 50, 50)
+		label.TextStrokeTransparency = 0.3
+		label.Parent = billboard
+
+		local hum = Instance.new("Humanoid")
+		hum.RigType = Enum.HumanoidRigType.R15
+		hum.HipHeight = 4
+		hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+		hum.MaxHealth = math.huge
+		hum.Health = math.huge
+		hum.BreakJointsOnDeath = false
+		hum.WalkSpeed = M.WanderSpeed * room.MonsterSpeed
+		hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+		hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+		hum.Parent = m
+
+		m:SetAttribute("IsMonster", true)
+		m.Parent = library.Model
+		hrp:SetNetworkOwner(nil)
+
+		model, humanoid, root, head, shushLabel = m, hum, hrp, headPart, label
+		return m
 	end
-	weldPart(m, hrp, {
-		Name = "Mouth",
-		Size = Vector3.new(0.9, 0.12, 0.05),
-		Color = Color3.new(0, 0, 0),
-		Offset = CFrame.new(0, 3.55, -0.92),
-	})
 
-	local glow = Instance.new("PointLight")
-	glow.Color = Color3.fromRGB(255, 40, 40)
-	glow.Range = 14
-	glow.Brightness = 2
-	glow.Parent = headPart
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromOffset(220, 60)
-	billboard.StudsOffset = Vector3.new(0, 3, 0)
-	billboard.AlwaysOnTop = false
-	billboard.MaxDistance = 80
-	billboard.Parent = headPart
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Text = ""
-	label.TextScaled = true
-	label.Font = Enum.Font.Creepster
-	label.TextColor3 = Color3.fromRGB(255, 50, 50)
-	label.TextStrokeTransparency = 0.3
-	label.Parent = billboard
-
-	local hum = Instance.new("Humanoid")
-	hum.RigType = Enum.HumanoidRigType.R15
-	hum.HipHeight = 4
-	hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-	hum.MaxHealth = math.huge
-	hum.Health = math.huge
-	hum.BreakJointsOnDeath = false
-	hum.WalkSpeed = M.WanderSpeed
-	hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-	hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
-	hum.Parent = m
-
-	m:SetAttribute("IsMonster", true)
-	m.Parent = Workspace
-	hrp:SetNetworkOwner(nil)
-
-	model, humanoid, root, head, shushLabel = m, hum, hrp, headPart, label
-	return m
-end
-
-local function flat(v: Vector3): Vector3
-	return Vector3.new(v.X, 0, v.Z)
-end
-
-local function chaseSpeed(): number
-	return M.ChaseSpeedStart + (M.ChaseSpeedEnd - M.ChaseSpeedStart) * math.clamp(MonsterService.Progress, 0, 1)
-end
-
-local function setGoal(position: Vector3)
-	if not root then
-		return
+	local function flat(v: Vector3): Vector3
+		return Vector3.new(v.X, 0, v.Z)
 	end
-	goal = position
-	waypoints = {}
-	wpIndex = 1
-	lastPathTime = os.clock()
-	local ok = pcall(function()
-		path:ComputeAsync(root.Position, position)
-	end)
-	if ok and path.Status == Enum.PathStatus.Success then
-		waypoints = path:GetWaypoints()
-		wpIndex = math.min(2, #waypoints)
-	end
-end
 
--- Loopt de berekende route af. Geeft true terug als het doel bereikt is.
-local function followPath(): boolean
-	if not root or not humanoid or not goal then
-		return true
+	local function chaseSpeed(): number
+		return (M.ChaseSpeedStart + (M.ChaseSpeedEnd - M.ChaseSpeedStart) * math.clamp(self.Progress, 0, 1)) * room.MonsterSpeed
 	end
-	if #waypoints == 0 then
-		humanoid:MoveTo(goal)
-		return flat(root.Position - goal).Magnitude < 3
+
+	local function setGoal(position: Vector3)
+		if not root then
+			return
+		end
+		goal = position
+		waypoints = {}
+		wpIndex = 1
+		lastPathTime = os.clock()
+		local ok = pcall(function()
+			path:ComputeAsync(root.Position, position)
+		end)
+		if ok and path.Status == Enum.PathStatus.Success then
+			waypoints = path:GetWaypoints()
+			wpIndex = math.min(2, #waypoints)
+		end
 	end
-	local wp = waypoints[wpIndex]
-	if not wp then
-		return true
-	end
-	local delta = wp.Position - root.Position
-	if flat(delta).Magnitude < 3 and math.abs(delta.Y) < 7 then
-		wpIndex += 1
-		wp = waypoints[wpIndex]
+
+	-- Loopt de berekende route af. Geeft true terug als het doel bereikt is.
+	local function followPath(): boolean
+		if not root or not humanoid or not goal then
+			return true
+		end
+		if #waypoints == 0 then
+			humanoid:MoveTo(goal)
+			return flat(root.Position - goal).Magnitude < 3
+		end
+		local wp = waypoints[wpIndex]
 		if not wp then
 			return true
 		end
-	end
-	humanoid:MoveTo(wp.Position)
-	return false
-end
-
-local function visionParams(): RaycastParams
-	local exclude: { Instance } = {}
-	if model then
-		table.insert(exclude, model)
-	end
-	local books = Workspace:FindFirstChild("Books")
-	if books then
-		table.insert(exclude, books)
-	end
-	for _, player in Players:GetPlayers() do
-		if player.Character then
-			table.insert(exclude, player.Character)
-		end
-	end
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = exclude
-	return params
-end
-
-local function characterRoot(player: Player): (BasePart?, Humanoid?)
-	local character = player.Character
-	if not character then
-		return nil, nil
-	end
-	local hum = character:FindFirstChildOfClass("Humanoid")
-	local hrp = character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not hum or not hrp or hum.Health <= 0 then
-		return nil, nil
-	end
-	return hrp, hum
-end
-
-local function canSee(player: Player, params: RaycastParams): boolean
-	if not root or not head then
-		return false
-	end
-	local hrp = characterRoot(player)
-	if not hrp or player:GetAttribute("Hidden") then
-		return false
-	end
-	local eye = head.Position
-	local offset = hrp.Position - eye
-	local dist = offset.Magnitude
-	if dist > M.SightRange then
-		return false
-	end
-	if dist > M.CloseDetectRange then
-		local look = flat(root.CFrame.LookVector).Unit
-		local dir = flat(offset)
-		if dir.Magnitude > 0.1 then
-			local angle = math.deg(math.acos(math.clamp(look:Dot(dir.Unit), -1, 1)))
-			if angle > M.FieldOfView / 2 then
-				return false
+		local delta = wp.Position - root.Position
+		if flat(delta).Magnitude < 3 and math.abs(delta.Y) < 7 then
+			wpIndex += 1
+			wp = waypoints[wpIndex]
+			if not wp then
+				return true
 			end
 		end
+		humanoid:MoveTo(wp.Position)
+		return false
 	end
-	local result = Workspace:Raycast(eye, offset, params)
-	return result == nil
-end
 
-local function startChase(player: Player)
-	if state ~= "Chase" or target ~= player then
-		state = "Chase"
-		target = player
-		sawHide = false
-		Remotes.Notify:FireClient(player, "Ze heeft je gezien! RENNEN!", Color3.fromRGB(255, 40, 40))
-	end
-	lastSeen = os.clock()
-end
-
-local function investigate(position: Vector3)
-	if state == "Chase" then
-		return
-	end
-	state = "Investigate"
-	setGoal(position)
-end
-
-function MonsterService.Noise(position: Vector3, range: number)
-	if not root or not running then
-		return
-	end
-	-- Wordt in de volgende tick verwerkt (zo rekent er maar één thread routes uit)
-	if (root.Position - position).Magnitude <= range then
-		pendingNoise = position
-	end
-end
-
-local function catch(player: Player)
-	local hrp, hum = characterRoot(player)
-	if not hrp or not hum then
-		return
-	end
-	Remotes.Caught:FireClient(player)
-	if MonsterService.OnCatch then
-		MonsterService.OnCatch(player)
-	end
-	local sound = Instance.new("Sound")
-	sound.SoundId = Config.SoundIds.Caught
-	sound.Volume = 1
-	sound.Parent = hrp
-	sound:Play()
-	task.delay(0.6, function()
-		if hum.Parent then
-			hum.Health = 0
+	local function visionParams(): RaycastParams
+		local exclude: { Instance } = {}
+		if model then
+			table.insert(exclude, model)
 		end
-	end)
-	state = "Pause"
-	target = nil
-	idleUntil = os.clock() + 3
-	if humanoid and root then
-		humanoid:MoveTo(root.Position)
-	end
-end
-
-local function pickWander()
-	local points = library.Waypoints
-	setGoal(points[math.random(1, #points)])
-end
-
-local function step()
-	if not root or not humanoid or not shushLabel then
-		return
-	end
-	local now = os.clock()
-	local params = visionParams()
-
-	if pendingNoise then
-		local position = pendingNoise
-		pendingNoise = nil
-		if state == "Wander" or state == "Investigate" then
-			investigate(position)
+		local books = library.Books
+		if books then
+			table.insert(exclude, books)
 		end
+		for _, player in getPlayers() do
+			if player.Character then
+				table.insert(exclude, player.Character)
+			end
+		end
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = exclude
+		return params
 	end
 
-	-- Zien
-	local best: Player? = nil
-	local bestDist = math.huge
-	for _, player in Players:GetPlayers() do
-		if canSee(player, params) then
-			local hrp = characterRoot(player)
-			if hrp then
-				local d = (hrp.Position - root.Position).Magnitude
-				if d < bestDist then
-					best, bestDist = player, d
+	local function characterRoot(player: Player): (BasePart?, Humanoid?)
+		local character = player.Character
+		if not character then
+			return nil, nil
+		end
+		local hum = character:FindFirstChildOfClass("Humanoid")
+		local hrp = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not hum or not hrp or hum.Health <= 0 then
+			return nil, nil
+		end
+		return hrp, hum
+	end
+
+	local function canSee(player: Player, params: RaycastParams): boolean
+		if not root or not head then
+			return false
+		end
+		local hrp = characterRoot(player)
+		if not hrp or player:GetAttribute("Hidden") then
+			return false
+		end
+		local eye = head.Position
+		local offset = hrp.Position - eye
+		local dist = offset.Magnitude
+		if dist > M.SightRange then
+			return false
+		end
+		if dist > M.CloseDetectRange then
+			local look = flat(root.CFrame.LookVector).Unit
+			local dir = flat(offset)
+			if dir.Magnitude > 0.1 then
+				local angle = math.deg(math.acos(math.clamp(look:Dot(dir.Unit), -1, 1)))
+				if angle > M.FieldOfView / 2 then
+					return false
 				end
 			end
 		end
-	end
-	if best and state ~= "Pause" then
-		startChase(best)
+		local result = Workspace:Raycast(eye, offset, params)
+		return result == nil
 	end
 
-	-- Horen: sprintende spelers in de buurt
-	if state == "Wander" or state == "Investigate" then
-		for _, player in Players:GetPlayers() do
-			local hrp = characterRoot(player)
-			if hrp and not player:GetAttribute("Hidden") then
-				local speed = flat(hrp.AssemblyLinearVelocity).Magnitude
-				local d = (hrp.Position - root.Position).Magnitude
-				if speed > Config.WalkSpeed + 2 and d < M.HearSprintRange and math.abs(hrp.Position.Y - root.Position.Y) < 14 then
-					if not goal or (goal - hrp.Position).Magnitude > 10 or state == "Wander" then
-						investigate(hrp.Position)
+	local function startChase(player: Player)
+		if state ~= "Chase" or target ~= player then
+			state = "Chase"
+			target = player
+			sawHide = false
+			Remotes.Notify:FireClient(player, "Ze heeft je gezien! RENNEN!", Color3.fromRGB(255, 40, 40))
+		end
+		lastSeen = os.clock()
+	end
+
+	local function investigate(position: Vector3)
+		if state == "Chase" then
+			return
+		end
+		state = "Investigate"
+		setGoal(position)
+	end
+
+	function self.Noise(position: Vector3, range: number)
+		if not root or not running then
+			return
+		end
+		-- Wordt in de volgende tick verwerkt (zo rekent er maar één thread routes uit)
+		if (root.Position - position).Magnitude <= range then
+			pendingNoise = position
+		end
+	end
+
+	local function catch(player: Player)
+		local hrp, hum = characterRoot(player)
+		if not hrp or not hum then
+			return
+		end
+		Remotes.Caught:FireClient(player)
+		if self.OnCatch then
+			self.OnCatch(player)
+		end
+		local sound = Instance.new("Sound")
+		sound.SoundId = Config.SoundIds.Caught
+		sound.Volume = 1
+		sound.Parent = hrp
+		sound:Play()
+		task.delay(0.6, function()
+			if hum.Parent then
+				hum.Health = 0
+			end
+		end)
+		state = "Pause"
+		target = nil
+		idleUntil = os.clock() + 3
+		if humanoid and root then
+			humanoid:MoveTo(root.Position)
+		end
+	end
+
+	local function pickWander()
+		local points = library.Waypoints
+		setGoal(points[math.random(1, #points)])
+	end
+
+	local function step()
+		if not root or not humanoid or not shushLabel then
+			return
+		end
+		local now = os.clock()
+		local params = visionParams()
+
+		if pendingNoise then
+			local position = pendingNoise
+			pendingNoise = nil
+			if state == "Wander" or state == "Investigate" then
+				investigate(position)
+			end
+		end
+
+		-- Zien
+		local best: Player? = nil
+		local bestDist = math.huge
+		for _, player in getPlayers() do
+			if canSee(player, params) then
+				local hrp = characterRoot(player)
+				if hrp then
+					local d = (hrp.Position - root.Position).Magnitude
+					if d < bestDist then
+						best, bestDist = player, d
 					end
-					break
 				end
 			end
 		end
-	end
-
-	if state == "Pause" then
-		humanoid.WalkSpeed = 0
-		shushLabel.Text = ""
-		if now >= idleUntil then
-			state = "Wander"
-			pickWander()
-		end
-		return
-	end
-
-	if state == "Chase" then
-		humanoid.WalkSpeed = chaseSpeed()
-		shushLabel.Text = "SSSSHHHH!"
-		local player = target
-		local hrp = player and characterRoot(player)
-		if not player or not hrp then
-			state = "Wander"
-			target = nil
-			pickWander()
-			return
+		if best and state ~= "Pause" then
+			startChase(best)
 		end
 
-		if player:GetAttribute("Hidden") then
-			-- Zag ze je wegkruipen? Dan trekt ze je uit het kluisje!
-			if not sawHide then
-				sawHide = true
-				hideChaseStart = now
-				local closeEnough = (hrp.Position - root.Position).Magnitude < 16
-				player:SetAttribute("SeenHiding", closeEnough)
-				-- Loop naar de plek vlak voor de deur van het kluisje
-				setGoal((hrp.CFrame * CFrame.new(0, 0, -4.5)).Position)
-			end
-			local arrived = followPath() or (hrp.Position - root.Position).Magnitude < 6
-			if not arrived and now - hideChaseStart > 10 then
-				-- Kwam er niet bij: opgeven
-				player:SetAttribute("SeenHiding", nil)
-				state = "Investigate"
-				target = nil
-				goal = nil
-				idleUntil = now + 2
-				return
-			end
-			if arrived then
-				if player:GetAttribute("SeenHiding") and MonsterService.OnHiddenCatch then
-					MonsterService.OnHiddenCatch(player)
-					catch(player)
-				else
-					state = "Investigate"
-					idleUntil = now + 3
-					goal = nil
+		-- Horen: sprintende spelers in de buurt
+		if state == "Wander" or state == "Investigate" then
+			for _, player in getPlayers() do
+				local hrp = characterRoot(player)
+				if hrp and not player:GetAttribute("Hidden") then
+					local speed = flat(hrp.AssemblyLinearVelocity).Magnitude
+					local d = (hrp.Position - root.Position).Magnitude
+					if speed > Config.WalkSpeed + 2 and d < M.HearSprintRange and math.abs(hrp.Position.Y - root.Position.Y) < 14 then
+						if not goal or (goal - hrp.Position).Magnitude > 10 or state == "Wander" then
+							investigate(hrp.Position)
+						end
+						break
+					end
 				end
-				player:SetAttribute("SeenHiding", nil)
 			end
-			return
-		end
-		sawHide = false
-
-		local d = (hrp.Position - root.Position).Magnitude
-		if d <= M.CatchDistance and math.abs(hrp.Position.Y - root.Position.Y) < 6 then
-			catch(player)
-			return
 		end
 
-		if best == player then
-			lastKnown = hrp.Position
-			waypoints = {}
-			goal = hrp.Position
-			humanoid:MoveTo(hrp.Position)
-		else
-			if now - lastSeen > M.LoseTargetTime then
-				Remotes.Notify:FireClient(player, "Ze is je kwijt... voor nu.", Color3.fromRGB(200, 200, 255))
-				state = "Investigate"
-				target = nil
-				setGoal(lastKnown or hrp.Position)
-				return
-			end
-			-- Ze weet ongeveer waar je bent
-			if now - lastPathTime > 1 then
-				setGoal(hrp.Position)
-			end
-			followPath()
-		end
-		return
-	end
-
-	shushLabel.Text = ""
-	humanoid.WalkSpeed = M.WanderSpeed
-
-	if state == "Investigate" then
-		if not goal then
-			-- Even rondkijken na een onderzoek
+		if state == "Pause" then
+			humanoid.WalkSpeed = 0
+			shushLabel.Text = ""
 			if now >= idleUntil then
 				state = "Wander"
 				pickWander()
 			end
 			return
 		end
-		if followPath() then
-			goal = nil
-			idleUntil = now + 2.5
+
+		if state == "Chase" then
+			humanoid.WalkSpeed = chaseSpeed()
+			shushLabel.Text = "SSSSHHHH!"
+			local player = target
+			local hrp = player and characterRoot(player)
+			if not player or not hrp then
+				state = "Wander"
+				target = nil
+				pickWander()
+				return
+			end
+
+			if player:GetAttribute("Hidden") then
+				-- Zag ze je wegkruipen? Dan trekt ze je uit het kluisje!
+				if not sawHide then
+					sawHide = true
+					hideChaseStart = now
+					local closeEnough = (hrp.Position - root.Position).Magnitude < 16
+					player:SetAttribute("SeenHiding", closeEnough)
+					-- Loop naar de plek vlak voor de deur van het kluisje
+					setGoal((hrp.CFrame * CFrame.new(0, 0, -4.5)).Position)
+				end
+				local arrived = followPath() or (hrp.Position - root.Position).Magnitude < 6
+				if not arrived and now - hideChaseStart > 10 then
+					-- Kwam er niet bij: opgeven
+					player:SetAttribute("SeenHiding", nil)
+					state = "Investigate"
+					target = nil
+					goal = nil
+					idleUntil = now + 2
+					return
+				end
+				if arrived then
+					if player:GetAttribute("SeenHiding") and self.OnHiddenCatch then
+						self.OnHiddenCatch(player)
+						catch(player)
+					else
+						state = "Investigate"
+						idleUntil = now + 3
+						goal = nil
+					end
+					player:SetAttribute("SeenHiding", nil)
+				end
+				return
+			end
+			sawHide = false
+
+			local d = (hrp.Position - root.Position).Magnitude
+			if d <= M.CatchDistance and math.abs(hrp.Position.Y - root.Position.Y) < 6 then
+				catch(player)
+				return
+			end
+
+			if best == player then
+				lastKnown = hrp.Position
+				waypoints = {}
+				goal = hrp.Position
+				humanoid:MoveTo(hrp.Position)
+			else
+				if now - lastSeen > M.LoseTargetTime then
+					Remotes.Notify:FireClient(player, "Ze is je kwijt... voor nu.", Color3.fromRGB(200, 200, 255))
+					state = "Investigate"
+					target = nil
+					setGoal(lastKnown or hrp.Position)
+					return
+				end
+				-- Ze weet ongeveer waar je bent
+				if now - lastPathTime > 1 then
+					setGoal(hrp.Position)
+				end
+				followPath()
+			end
+			return
 		end
-	elseif state == "Wander" then
-		if not goal then
-			if now >= idleUntil then
+
+		shushLabel.Text = ""
+		humanoid.WalkSpeed = M.WanderSpeed * room.MonsterSpeed
+
+		if state == "Investigate" then
+			if not goal then
+				-- Even rondkijken na een onderzoek
+				if now >= idleUntil then
+					state = "Wander"
+					pickWander()
+				end
+				return
+			end
+			if followPath() then
+				goal = nil
+				idleUntil = now + 2.5
+			end
+		elseif state == "Wander" then
+			if not goal then
+				if now >= idleUntil then
+					pickWander()
+				end
+			elseif followPath() then
+				goal = nil
+				idleUntil = now + math.random(10, 30) / 10
+			end
+		end
+
+		-- Vastgelopen? Kies een nieuw doel
+		if now - stuckCheckTime > 2.5 then
+			if goal and (root.Position - stuckCheckPos).Magnitude < 1 then
 				pickWander()
 			end
-		elseif followPath() then
-			goal = nil
-			idleUntil = now + math.random(10, 30) / 10
+			stuckCheckPos = root.Position
+			stuckCheckTime = now
 		end
 	end
 
-	-- Vastgelopen? Kies een nieuw doel
-	if now - stuckCheckTime > 2.5 then
-		if goal and (root.Position - stuckCheckPos).Magnitude < 1 then
-			pickWander()
+	function self.Spawn()
+		self.Despawn()
+		buildModel(library.MonsterSpawn)
+		running = true
+		state = "Wander"
+		target = nil
+		goal = nil
+		waypoints = {}
+		pendingNoise = nil
+		loopId += 1
+		local myId = loopId
+		for _, player in getPlayers() do
+			Remotes.Notify:FireClient(player, M.Name .. " is wakker geworden... wees STIL.", Color3.fromRGB(255, 60, 60))
 		end
-		stuckCheckPos = root.Position
-		stuckCheckTime = now
-	end
-end
-
-function MonsterService.Spawn()
-	MonsterService.Despawn()
-	buildModel(library.MonsterSpawn)
-	running = true
-	state = "Wander"
-	target = nil
-	goal = nil
-	waypoints = {}
-	pendingNoise = nil
-	loopId += 1
-	local myId = loopId
-	Remotes.Notify:FireAllClients(M.Name .. " is wakker geworden... wees STIL.", Color3.fromRGB(255, 60, 60))
-	task.spawn(function()
-		while running and loopId == myId do
-			local ok, err = pcall(step)
-			if not ok then
-				warn("[Monster] " .. tostring(err))
+		task.spawn(function()
+			while running and loopId == myId do
+				local ok, err = pcall(step)
+				if not ok then
+					warn("[Monster] " .. tostring(err))
+				end
+				task.wait(0.15)
 			end
-			task.wait(0.15)
-		end
-	end)
-end
-
-function MonsterService.Despawn()
-	running = false
-	if model then
-		model:Destroy()
+		end)
 	end
-	model, humanoid, root, head, shushLabel = nil, nil, nil, nil, nil
-end
 
-function MonsterService.Init(lib)
-	library = lib
+	function self.Despawn()
+		running = false
+		if model then
+			model:Destroy()
+		end
+		model, humanoid, root, head, shushLabel = nil, nil, nil, nil, nil
+	end
+
+	return self
 end
 
 return MonsterService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
-          <string name="Name">RoundService</string>
-          <string name="Source"><![CDATA[-- Rondes: pauze -> opruimen (met monster en tijdslimiet) -> gewonnen/verloren -> opnieuw.
--- De status staat in attributen op Workspace zodat de client die kan tonen.
+          <string name="Name">RoomService</string>
+          <string name="Source"><![CDATA[-- Zalen: vanuit de hal kies je een deur. Elke zaal heeft zijn eigen ronde:
+-- aftellen -> opruimen (met tijdslimiet en evt. monster) -> gewonnen/verloren -> terug naar de hal.
+-- De status van elke zaal staat als attributen in ReplicatedStorage.RoomState.<Id>.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local BookService = require(script.Parent.BookService)
 local MonsterService = require(script.Parent.MonsterService)
 local DataService = require(script.Parent.DataService)
+local HideService = require(script.Parent.HideService)
 
-local RoundService = {}
+type Room = {
+	Info: Config.RoomInfo,
+	Library: any,
+	Books: BookService.BookService,
+	Monster: MonsterService.Monster?,
+	State: Folder,
+	Door: any,
+	Players: { [Player]: boolean },
+	Status: string, -- Idle | Starting | Playing | Won | Lost
+	Finished: boolean,
+	RoundRunning: boolean,
+	TimeLeft: number,
+}
 
-local finished = false
+local RoomService = {}
 
-local function setState(state: string, message: string?)
-	Workspace:SetAttribute("RoundState", state)
-	Workspace:SetAttribute("Message", message or "")
+local rooms: { [string]: Room } = {}
+local playerRoom: { [Player]: Room } = {}
+local touchCooldown: { [Player]: number } = {}
+local lobby
+
+local function notify(player: Player, text: string, color: Color3?)
+	Remotes.Notify:FireClient(player, text, color)
 end
 
 local function formatTime(seconds: number): string
 	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
-local function respawnEveryone()
-	for _, player in Players:GetPlayers() do
-		task.spawn(function()
-			player:LoadCharacter()
-		end)
+local function roomPlayers(room: Room): { Player }
+	local list = {}
+	for player in room.Players do
+		table.insert(list, player)
+	end
+	return list
+end
+
+local function isEmpty(room: Room): boolean
+	return next(room.Players) == nil
+end
+
+local function updateDoor(room: Room)
+	local count = #roomPlayers(room)
+	local status = if room.Status == "Idle"
+		then "Vrij · stap in de ring!"
+		elseif room.Status == "Starting" then "Begint zo..."
+		elseif room.Status == "Playing" then "Bezig · " .. formatTime(room.TimeLeft)
+		else "Wordt opgeruimd..."
+	room.Door.Info.Text = string.format("👥 %d   %s", count, status)
+	room.State:SetAttribute("Players", count)
+end
+
+local function setState(room: Room, status: string, message: string)
+	room.Status = status
+	room.State:SetAttribute("RoundState", status)
+	room.State:SetAttribute("Message", message)
+	updateDoor(room)
+end
+
+local function getRoot(player: Player): BasePart?
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not character or not humanoid or humanoid.Health <= 0 then
+		return nil
+	end
+	return character:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function teleport(player: Player, cf: CFrame)
+	local character = player.Character
+	local root = getRoot(player)
+	if character and root then
+		root.Anchored = false
+		character:PivotTo(cf + Vector3.new(math.random(-30, 30) / 10, 0, math.random(-20, 20) / 10))
 	end
 end
 
-local function runRound()
-	-- Pauze
-	MonsterService.Despawn()
-	BookService.Clear()
-	for _, player in Players:GetPlayers() do
-		DataService.SetRoundBooks(player, 0)
-	end
-	while #Players:GetPlayers() == 0 do
-		setState("Waiting", "Wachten op spelers...")
-		task.wait(1)
-	end
-	for t = Config.IntermissionTime, 1, -1 do
-		setState("Intermission", "De nacht begint over " .. t .. "...")
-		Workspace:SetAttribute("TimeLeft", t)
-		task.wait(1)
-	end
+local function sendEmptyInventory(player: Player)
+	Remotes.Inventory:FireClient(player, {}, player:GetAttribute("Capacity") or Config.BaseCapacity)
+end
 
-	-- Opruimen!
-	respawnEveryone()
-	finished = false
-	BookService.SpawnAll()
-	MonsterService.Progress = 0
-	setState("Playing", "Ruim de bibliotheek op voordat de nacht voorbij is!")
-	Remotes.Notify:FireAllClients("Zet alle boeken terug in de juiste kast. En wees STIL...", Color3.fromRGB(255, 220, 150))
+function RoomService.GetRoom(player: Player): Room?
+	return playerRoom[player]
+end
 
-	local timeLeft = Config.RoundTime
-	local elapsed = 0
-	local monsterSpawned = false
-	while timeLeft > 0 and not finished do
-		Workspace:SetAttribute("TimeLeft", timeLeft)
-		task.wait(1)
-		timeLeft -= 1
-		elapsed += 1
-		MonsterService.Progress = BookService.Placed / Config.TotalBooks()
-		if not monsterSpawned and elapsed >= Config.Monster.SpawnDelay then
-			monsterSpawned = true
-			MonsterService.Spawn()
+function RoomService.GetBooks(player: Player): BookService.BookService?
+	local room = playerRoom[player]
+	return if room then room.Books else nil
+end
+
+function RoomService.Leave(player: Player, toLobby: boolean)
+	local room = playerRoom[player]
+	if not room then
+		return
+	end
+	HideService.Exit(player)
+	room.Books:RemovePlayer(player)
+	room.Players[player] = nil
+	playerRoom[player] = nil
+	player:SetAttribute("Room", nil)
+	touchCooldown[player] = os.clock() + 3
+	if toLobby then
+		teleport(player, lobby.SpawnCFrame)
+		sendEmptyInventory(player)
+	end
+	updateDoor(room)
+end
+
+local runRound
+
+function RoomService.Join(player: Player, roomId: string)
+	local room = rooms[roomId]
+	if not room or playerRoom[player] or not getRoot(player) then
+		return
+	end
+	if room.Status == "Won" or room.Status == "Lost" then
+		notify(player, room.Info.Name .. " wordt net opgeruimd. Probeer het zo nog eens!", Color3.fromRGB(255, 200, 120))
+		return
+	end
+	room.Players[player] = true
+	playerRoom[player] = room
+	player:SetAttribute("Room", room.Info.Id)
+	DataService.SetRoundBooks(player, 0)
+	room.Books:AddPlayer(player)
+	teleport(player, room.Library.SpawnCFrame)
+	notify(player, "Welkom in de " .. room.Info.Name .. "!", room.Info.Color)
+	if not room.RoundRunning then
+		task.spawn(runRound, room)
+	end
+	updateDoor(room)
+end
+
+local function playRound(room: Room)
+	local info = room.Info
+	room.Finished = false
+	room.Books:Clear()
+
+	local aborted = false
+	for t = Config.StartCountdown, 1, -1 do
+		if isEmpty(room) then
+			aborted = true
+			break
 		end
+		room.TimeLeft = t
+		room.State:SetAttribute("TimeLeft", t)
+		setState(room, "Starting", "De zaal gaat open over " .. t .. "...")
+		task.wait(1)
 	end
-	Workspace:SetAttribute("TimeLeft", math.max(timeLeft, 0))
 
-	BookService.Active = false
-	MonsterService.Despawn()
+	local elapsed = 0
+	if not aborted then
+		room.Books:SpawnAll()
+		setState(room, "Playing", "Ruim alle kasten op!")
+		for _, player in roomPlayers(room) do
+			notify(player, "Zet alle boeken terug in de juiste kast!", Color3.fromRGB(255, 220, 150))
+		end
+		local timeLeft = info.RoundTime
+		local monsterSpawned = false
+		while timeLeft > 0 and not room.Finished do
+			if isEmpty(room) then
+				aborted = true
+				break
+			end
+			room.TimeLeft = timeLeft
+			room.State:SetAttribute("TimeLeft", timeLeft)
+			updateDoor(room)
+			task.wait(1)
+			timeLeft -= 1
+			elapsed += 1
+			local monster = room.Monster
+			if monster then
+				monster.Progress = room.Books.Placed / room.Books.Total
+				if not monsterSpawned and elapsed >= Config.Monster.SpawnDelay then
+					monsterSpawned = true
+					monster.Spawn()
+				end
+			end
+		end
+		room.TimeLeft = math.max(timeLeft, 0)
+		room.State:SetAttribute("TimeLeft", room.TimeLeft)
+	end
 
-	if finished then
-		local text = "DE BIBLIOTHEEK IS SCHOON! Tijd: " .. formatTime(elapsed)
-		setState("Won", text)
-		for _, player in Players:GetPlayers() do
-			DataService.AddCoins(player, Config.CoinsForWin)
+	room.Books.Active = false
+	if room.Monster then
+		room.Monster.Despawn()
+	end
+	if aborted then
+		return
+	end
+
+	if room.Finished then
+		setState(room, "Won", "DE ZAAL IS SCHOON! Tijd: " .. formatTime(elapsed))
+		local reward = math.floor(Config.CoinsForWin * info.CoinMultiplier)
+		for _, player in roomPlayers(room) do
+			DataService.AddCoins(player, reward)
+			notify(player, "+" .. reward .. " munten!", Color3.fromRGB(255, 215, 0))
 			local profile = DataService.Get(player)
 			if profile then
 				profile.Wins += 1
 				if not profile.BestTime or elapsed < profile.BestTime then
 					profile.BestTime = elapsed
-					Remotes.Notify:FireClient(player, "Nieuw record: " .. formatTime(elapsed) .. "!", Color3.fromRGB(255, 215, 0))
 				end
 			end
 		end
 	else
-		setState("Lost", "De nachtmerrie heeft gewonnen... " .. BookService.Placed .. "/" .. Config.TotalBooks() .. " boeken")
+		setState(room, "Lost", "De tijd is op... " .. room.Books.Placed .. "/" .. room.Books.Total .. " boeken")
 	end
 	task.wait(Config.EndScreenTime)
+	for _, player in roomPlayers(room) do
+		RoomService.Leave(player, true)
+	end
 end
 
-function RoundService.Init()
-	BookService.OnAllPlaced = function()
-		finished = true
+function runRound(room: Room)
+	room.RoundRunning = true
+	local ok, err = pcall(playRound, room)
+	if not ok then
+		warn("[Room " .. room.Info.Id .. "] " .. tostring(err))
 	end
-	BookService.OnBookPlaced = function(player, count)
-		DataService.AddCoins(player, count * Config.CoinsPerBook)
+	room.Books.Active = false
+	if room.Monster then
+		room.Monster.Despawn()
+	end
+	room.Books:Clear()
+	room.RoundRunning = false
+	setState(room, "Idle", "")
+	-- Kwam er iemand binnen terwijl we aan het opruimen waren? Dan meteen opnieuw.
+	if not isEmpty(room) then
+		task.spawn(runRound, room)
+	end
+end
+
+local function createRoom(info: Config.RoomInfo, library, door, stateFolder: Folder): Room
+	local state = Instance.new("Folder")
+	state.Name = info.Id
+	state:SetAttribute("Name", info.Name)
+	state:SetAttribute("Dark", info.Dark)
+	state:SetAttribute("Total", Config.RoomTotalBooks(info))
+	state.Parent = stateFolder
+
+	local room: Room = {
+		Info = info,
+		Library = library,
+		Books = BookService.new(info, library, state),
+		Monster = nil,
+		State = state,
+		Door = door,
+		Players = {},
+		Status = "Idle",
+		Finished = false,
+		RoundRunning = false,
+		TimeLeft = 0,
+	}
+
+	room.Books.OnAllPlaced = function()
+		room.Finished = true
+	end
+	room.Books.OnBookPlaced = function(player, count)
+		DataService.AddCoins(player, math.max(1, math.floor(count * Config.CoinsPerBook * info.CoinMultiplier + 0.5)))
 		DataService.SetRoundBooks(player, DataService.GetRoundBooks(player) + count)
 	end
-	BookService.OnMistake = function(_player, position)
-		MonsterService.Noise(position, Config.Monster.HearMistakeRange)
+
+	if info.Monster then
+		local monster = MonsterService.new(info, library, function()
+			return roomPlayers(room)
+		end)
+		monster.OnCatch = function(player)
+			room.Books:Scatter(player)
+		end
+		monster.OnHiddenCatch = function(player)
+			HideService.Exit(player)
+		end
+		room.Books.OnMistake = function(_player, position)
+			monster.Noise(position, Config.Monster.HearMistakeRange)
+		end
+		room.Monster = monster
 	end
 
-	Workspace:SetAttribute("Total", Config.TotalBooks())
-	task.spawn(function()
-		while true do
-			local ok, err = pcall(runRound)
-			if not ok then
-				warn("[Round] " .. tostring(err))
-				task.wait(3)
-			end
+	library.ExitPrompt.Triggered:Connect(function(player)
+		if playerRoom[player] == room then
+			RoomService.Leave(player, true)
 		end
+	end)
+
+	door.Prompt.Triggered:Connect(function(player)
+		RoomService.Join(player, info.Id)
+	end)
+	door.Zone.Touched:Connect(function(hit)
+		local character = hit.Parent
+		local player = character and Players:GetPlayerFromCharacter(character)
+		if player and not playerRoom[player] and os.clock() >= (touchCooldown[player] or 0) then
+			touchCooldown[player] = os.clock() + 2
+			RoomService.Join(player, info.Id)
+		end
+	end)
+
+	setState(room, "Idle", "")
+	return room
+end
+
+function RoomService.Init(lobbyData, libraries: { [string]: any })
+	lobby = lobbyData
+	local stateFolder = Instance.new("Folder")
+	stateFolder.Name = "RoomState"
+	stateFolder.Parent = ReplicatedStorage
+
+	for _, info in Config.Rooms do
+		rooms[info.Id] = createRoom(info, libraries[info.Id], lobby.Doors[info.Id], stateFolder)
+	end
+
+	Remotes.Action.OnServerEvent:Connect(function(player, action)
+		local room = playerRoom[player]
+		if action == "Drop" and room then
+			room.Books:Drop(player)
+		elseif action == "Leave" and room then
+			RoomService.Leave(player, true)
+		end
+	end)
+
+	local function onPlayer(player: Player)
+		player:GetAttributeChangedSignal("Capacity"):Connect(function()
+			local room = playerRoom[player]
+			if room then
+				room.Books:Changed(player)
+			else
+				sendEmptyInventory(player)
+			end
+		end)
+		player.CharacterAdded:Connect(function(character)
+			local humanoid = character:WaitForChild("Humanoid") :: Humanoid
+			local root = character:WaitForChild("HumanoidRootPart") :: BasePart
+			humanoid.Died:Connect(function()
+				local room = playerRoom[player]
+				if room then
+					room.Books:Scatter(player)
+				end
+			end)
+			-- Na doodgaan kom je terug in je zaal (zolang de ronde nog loopt)
+			task.defer(function()
+				local room = playerRoom[player]
+				if room and (room.Status == "Playing" or room.Status == "Starting") then
+					task.wait(0.2)
+					teleport(player, room.Library.SpawnCFrame)
+					room.Books:Changed(player)
+				elseif room then
+					RoomService.Leave(player, false)
+				end
+			end)
+			-- Wie ergens doorheen valt, komt terug bij het begin
+			task.spawn(function()
+				while character.Parent do
+					if root.Position.Y < -30 then
+						local room = playerRoom[player]
+						teleport(player, if room then room.Library.SpawnCFrame else lobby.SpawnCFrame)
+					end
+					task.wait(2)
+				end
+			end)
+		end)
+	end
+	Players.PlayerAdded:Connect(onPlayer)
+	for _, player in Players:GetPlayers() do
+		onPlayer(player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		RoomService.Leave(player, false)
+		touchCooldown[player] = nil
 	end)
 end
 
-return RoundService
+return RoomService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">ShopService</string>
           <string name="Source"><![CDATA[-- Winkel, magie en de assistent: kopen met munten en de vaardigheden uitvoeren.
@@ -3292,7 +4302,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local KeyService = require(script.Parent.KeyService)
-local BookService = require(script.Parent.BookService)
+local RoomService = require(script.Parent.RoomService)
 
 local ShopService = {}
 
@@ -3381,11 +4391,13 @@ local function useAbility(player: Player, id: string)
 	end
 	if id == "Assemble" then
 		mine[id] = now + info.Cooldown
-		local got = BookService.Assemble(player, Config.AssembleRadius)
+		local books = RoomService.GetBooks(player)
+		local got = if books then books:Assemble(player, Config.AssembleRadius) else 0
 		notify(player, if got > 0 then string.format("🧲 %d boek%s verzameld!", got, if got == 1 then "" else "en") else "🧲 Geen boeken in de buurt (of je handen zijn vol).", Color3.fromRGB(150, 210, 255))
 	elseif id == "AutoShelf" then
 		mine[id] = now + info.Cooldown
-		local placed = BookService.AutoShelf(player)
+		local books = RoomService.GetBooks(player)
+		local placed = if books then books:AutoShelf(player) else 0
 		notify(player, if placed > 0 then string.format("✨ %d boek%s teruggezet!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
 	end
 end
@@ -3412,11 +4424,12 @@ function ShopService.Init()
 				local profile = DataService.Get(player)
 				local level = if profile then profile.Assistant else 0
 				local levelInfo = Config.Assistant.Levels[level]
-				if levelInfo and BookService.Active then
+				local books = RoomService.GetBooks(player)
+				if levelInfo and books and books.Active then
 					timers[player] = (timers[player] or 0) + 1
 					if timers[player] >= levelInfo.Interval then
 						timers[player] = 0
-						task.spawn(BookService.AssistantPlace, player)
+						task.spawn(books.AssistantPlace, books, player)
 					end
 				end
 			end
@@ -3435,16 +4448,16 @@ return ShopService
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="15">
+  <Item class="StarterPlayer" referent="16">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <bool name="EnableMouseLockOption">false</bool>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="16">
+    <Item class="StarterPlayerScripts" referent="17">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="17">
+      <Item class="LocalScript" referent="18">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[-- Startpunt van de client.
@@ -3458,7 +4471,7 @@ Controls.Init(Hud)
 Effects.Init(Hud)
 ]]></string>
         </Properties>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">Controls</string>
             <string name="Source"><![CDATA[-- Besturing: sprinten met uithoudingsvermogen, boeken laten vallen,
@@ -3495,6 +4508,16 @@ local function getRoot(): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
+-- Het model van de zaal waar je nu bent (nil = in de hal)
+local function roomModel(): Instance?
+	local id = player:GetAttribute("Room")
+	local rooms = Workspace:FindFirstChild("Rooms")
+	if type(id) ~= "string" or not rooms then
+		return nil
+	end
+	return rooms:FindFirstChild(id)
+end
+
 local function drop()
 	if #Controls.Inventory > 0 then
 		Remotes.Action:FireServer("Drop")
@@ -3504,8 +4527,10 @@ end
 -- Inzicht: laat even alle losse boeken in de buurt oplichten
 local function insight(): boolean
 	local root = getRoot()
-	local books = Workspace:FindFirstChild("Books")
+	local room = roomModel()
+	local books = room and room:FindFirstChild("Books")
 	if not root or not books then
+		Hud.Notify("Ga eerst een zaal in.", Color3.fromRGB(220, 220, 220))
 		return false
 	end
 	local markers = {}
@@ -3553,8 +4578,8 @@ local function shelfGuide(): boolean
 		return false
 	end
 	local root = getRoot()
-	local library = Workspace:FindFirstChild("Library")
-	local sections = library and library:FindFirstChild("Sections")
+	local room = roomModel()
+	local sections = room and room:FindFirstChild("Sections")
 	local sectionModel = sections and sections:FindFirstChild("Section_" .. book.Code)
 	local zone = sectionModel and sectionModel:FindFirstChild("PromptZone") :: BasePart?
 	if not root or not zone then
@@ -3718,18 +4743,20 @@ return Controls
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">Effects</string>
-            <string name="Source"><![CDATA[-- Effecten: flikkerende lampjes, rode rand en hartslag-schudden als
--- het monster dichtbij is, de jumpscare, en gevonden sleutels verbergen.
+            <string name="Source"><![CDATA[-- Effecten: donkere sfeer + zaklamp in de Nachtmerriezaal, flikkerende lampjes,
+-- rode rand en hartslag-schudden als het monster dichtbij is, de jumpscare,
+-- gevonden sleutels verbergen en de kramen in de hal.
 
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local player = Players.LocalPlayer
@@ -3739,10 +4766,79 @@ local Effects = {}
 
 local Hud
 local flickerLights: { { part: BasePart, light: Light } } = {}
+local savedLighting: { [string]: any }? = nil
 
-local function collectFlickers(library: Instance)
+local DARK_LIGHTING = {
+	ClockTime = 0,
+	Brightness = 0,
+	Ambient = Color3.fromRGB(30, 26, 40),
+	OutdoorAmbient = Color3.fromRGB(10, 10, 16),
+	EnvironmentDiffuseScale = 0,
+	EnvironmentSpecularScale = 0,
+	FogColor = Color3.fromRGB(6, 5, 10),
+	FogStart = 10,
+	FogEnd = 110,
+}
+
+local function roomModel(): Instance?
+	local id = player:GetAttribute("Room")
+	local rooms = Workspace:FindFirstChild("Rooms")
+	if type(id) ~= "string" or not rooms then
+		return nil
+	end
+	return rooms:FindFirstChild(id)
+end
+
+-- Nachtmerrie-sfeer aan of uit (alleen voor deze speler)
+local function setDark(dark: boolean)
+	if dark and not savedLighting then
+		local saved = {}
+		for key, value in DARK_LIGHTING do
+			saved[key] = (Lighting :: any)[key]
+			;(Lighting :: any)[key] = value
+		end
+		savedLighting = saved
+	elseif not dark and savedLighting then
+		for key, value in savedLighting do
+			(Lighting :: any)[key] = value
+		end
+		savedLighting = nil
+	end
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atmosphere then
+		atmosphere.Density = if dark then 0 else 0.12
+	end
+end
+
+-- Een zaklamp die alleen jij ziet, in donkere zalen
+local function updateFlashlight(dark: boolean)
+	local character = player.Character
+	local head = character and character:FindFirstChild("Head")
+	if not head then
+		return
+	end
+	local light = head:FindFirstChild("LocalFlashlight")
+	if dark and not light then
+		local spot = Instance.new("SpotLight")
+		spot.Name = "LocalFlashlight"
+		spot.Range = 45
+		spot.Angle = 55
+		spot.Brightness = 3
+		spot.Shadows = true
+		spot.Color = Color3.fromRGB(255, 245, 220)
+		spot.Face = Enum.NormalId.Front
+		spot.Parent = head
+	elseif not dark and light then
+		light:Destroy()
+	end
+end
+
+local function collectFlickers(room: Instance?)
 	table.clear(flickerLights)
-	for _, d in library:GetDescendants() do
+	if not room then
+		return
+	end
+	for _, d in room:GetDescendants() do
 		if d:IsA("BasePart") and d:GetAttribute("Flicker") then
 			local light = d:FindFirstChildWhichIsA("Light")
 			if light then
@@ -3768,48 +4864,82 @@ local function flickerLoop()
 	end
 end
 
--- Sleutels die je al hebt worden (alleen voor jou) onzichtbaar
-local function updateKeys(library: Instance)
-	local keys = library:FindFirstChild("Keys")
-	if not keys then
+local function onRoomChanged()
+	local room = roomModel()
+	local dark = room ~= nil and room:GetAttribute("Dark") == true
+	setDark(dark)
+	updateFlashlight(dark)
+	collectFlickers(if dark then room else nil)
+end
+
+-- Sleutels die je al hebt worden (alleen voor jou) onzichtbaar, in alle zalen
+local function updateKeys()
+	local rooms = Workspace:FindFirstChild("Rooms")
+	if not rooms then
 		return
 	end
-	for _, key in keys:GetChildren() do
-		if key:IsA("BasePart") then
-			local has = player:GetAttribute("Key_" .. tostring(key:GetAttribute("KeyId"))) == true
-			key.LocalTransparencyModifier = if has then 1 else 0
-			local prompt = key:FindFirstChildOfClass("ProximityPrompt")
-			if prompt then
-				prompt.Enabled = not has
-			end
-			local light = key:FindFirstChildWhichIsA("Light")
-			if light then
-				light.Enabled = not has
+	for _, room in rooms:GetChildren() do
+		local keys = room:FindFirstChild("Keys")
+		if keys then
+			for _, key in keys:GetChildren() do
+				if key:IsA("BasePart") then
+					local has = player:GetAttribute("Key_" .. tostring(key:GetAttribute("KeyId"))) == true
+					key.LocalTransparencyModifier = if has then 1 else 0
+					local prompt = key:FindFirstChildOfClass("ProximityPrompt")
+					if prompt then
+						prompt.Enabled = not has
+					end
+					local light = key:FindFirstChildWhichIsA("Light")
+					if light then
+						light.Enabled = not has
+					end
+				end
 			end
 		end
 	end
 end
 
+local function findMonster(room: Instance?): BasePart?
+	if not room then
+		return nil
+	end
+	for _, child in room:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("IsMonster") then
+			return child:FindFirstChild("HumanoidRootPart") :: BasePart?
+		end
+	end
+	return nil
+end
+
 function Effects.Init(hud)
 	Hud = hud
 
-	local library = Workspace:WaitForChild("Library")
-	collectFlickers(library)
+	Workspace:WaitForChild("Rooms")
 	task.spawn(flickerLoop)
+	updateKeys()
+	onRoomChanged()
 
-	updateKeys(library)
 	player.AttributeChanged:Connect(function(name)
 		if string.sub(name, 1, 4) == "Key_" then
-			updateKeys(library)
+			updateKeys()
 		elseif name == "Hidden" then
 			Hud.SetHidden(player:GetAttribute("Hidden") == true)
+		elseif name == "Room" then
+			onRoomChanged()
 		end
 	end)
-	-- De sleutels kunnen net na de bibliotheek binnenkomen
-	library.ChildAdded:Connect(function(child)
-		if child.Name == "Keys" then
-			task.wait(0.5)
-			updateKeys(library)
+	player.CharacterAdded:Connect(function(character)
+		character:WaitForChild("Head")
+		onRoomChanged()
+	end)
+	-- De sleutels komen net na de zalen binnen
+	task.delay(2, updateKeys)
+
+	-- Kramen in de hal openen een venster
+	ProximityPromptService.PromptTriggered:Connect(function(prompt)
+		local panel = prompt:GetAttribute("OpenPanel")
+		if type(panel) == "string" then
+			Hud.TogglePanel(panel)
 		end
 	end)
 
@@ -3823,10 +4953,9 @@ function Effects.Init(hud)
 
 	-- Hoe dichter het monster, hoe roder het scherm en hoe meer het beeld trilt
 	RunService:BindToRenderStep("MonsterDanger", Enum.RenderPriority.Camera.Value + 1, function()
-		local monster = Workspace:FindFirstChild(Config.Monster.Name)
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local monsterRoot = monster and monster:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local monsterRoot = findMonster(roomModel())
 		if not root or not monsterRoot then
 			Hud.SetDanger(0)
 			return
@@ -3853,7 +4982,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">Hud</string>
             <string name="Source"><![CDATA[-- Het scherm, in de stijl van het origineel:
@@ -3891,6 +5020,8 @@ local ROUND = Enum.Font.FredokaOne
 
 local gui: ScreenGui
 local timerLabel: TextLabel
+local countersHolder: Frame
+local leaveButton: TextButton
 local placedLabel: TextLabel
 local carriedLabel: TextLabel
 local sectionsLeftLabel: TextLabel
@@ -4491,6 +5622,7 @@ local function buildBottomRight()
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
+	countersHolder = holder
 	sectionsLeftLabel = outlined({
 		Size = UDim2.new(1, 0, 0, 56),
 		Font = SERIF,
@@ -4588,6 +5720,27 @@ local function buildTopLeft()
 		stroke(icon, info.Color, 2)
 		keyIcons[info.Id] = icon
 	end
+end
+
+local function buildLeaveButton()
+	leaveButton = make("TextButton", {
+		Name = "Leave",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 70),
+		Size = UDim2.fromOffset(220, 46),
+		BackgroundColor3 = NAVY,
+		Font = SERIF,
+		TextSize = 26,
+		TextColor3 = WHITE,
+		Text = "🚪 Terug naar de hal",
+		Visible = false,
+		Parent = gui,
+	})
+	corner(leaveButton, 8)
+	stroke(leaveButton, NAVY_EDGE, 2.5)
+	leaveButton.Activated:Connect(function()
+		Remotes.Action:FireServer("Leave")
+	end)
 end
 
 local function buildTouchButtons()
@@ -4885,12 +6038,36 @@ local function updatePlayerStats()
 	refreshOpenPanel()
 end
 
+-- De status-map van de zaal waar je nu in bent (nil = in de hal)
+local function currentRoomState(): Instance?
+	local id = player:GetAttribute("Room")
+	local folder = ReplicatedStorage:FindFirstChild("RoomState")
+	if type(id) ~= "string" or not folder then
+		return nil
+	end
+	return folder:FindFirstChild(id)
+end
+
 local function updateRound()
-	local state = Workspace:GetAttribute("RoundState") or "Waiting"
-	local timeLeft = Workspace:GetAttribute("TimeLeft") or 0
-	local placed = Workspace:GetAttribute("Placed") or 0
-	local total = Workspace:GetAttribute("Total") or Config.TotalBooks()
-	local message = Workspace:GetAttribute("Message") or ""
+	local roomState = currentRoomState()
+	if not roomState then
+		-- In de hal
+		timerLabel.Visible = false
+		countersHolder.Visible = false
+		leaveButton.Visible = false
+		bigBanner.Visible = false
+		objectiveLabel.Text = "Kies een zaal!"
+		return
+	end
+	timerLabel.Visible = true
+	countersHolder.Visible = true
+	leaveButton.Visible = true
+
+	local state = roomState:GetAttribute("RoundState") or "Idle"
+	local timeLeft = roomState:GetAttribute("TimeLeft") or 0
+	local placed = roomState:GetAttribute("Placed") or 0
+	local total = roomState:GetAttribute("Total") or 0
+	local message = roomState:GetAttribute("Message") or ""
 
 	timerLabel.Text = formatTime(timeLeft)
 	timerLabel.TextColor3 = if state == "Playing" and timeLeft <= 60 then Color3.fromRGB(255, 90, 90) else WHITE
@@ -4900,8 +6077,8 @@ local function updateRound()
 		local left = total - placed
 		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
 		objectiveLabel.Text = "Ruim alle kasten op"
-	elseif state == "Intermission" then
-		sectionsLeftLabel.Text = "de bibliotheek gaat zo open..."
+	elseif state == "Starting" then
+		sectionsLeftLabel.Text = "de zaal gaat zo open..."
 		objectiveLabel.Text = message
 	else
 		sectionsLeftLabel.Text = ""
@@ -4940,6 +6117,7 @@ function Hud.Init()
 	buildBottomLeft()
 	buildBottomRight()
 	buildTopLeft()
+	buildLeaveButton()
 	buildTouchButtons()
 	buildShopPanel()
 	buildMagicPanel()
@@ -4949,11 +6127,25 @@ function Hud.Init()
 	fitToScreen()
 	Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitToScreen)
 
-	for _, name in { "RoundState", "TimeLeft", "Placed", "Total", "Message" } do
-		Workspace:GetAttributeChangedSignal(name):Connect(updateRound)
-	end
+	-- Elke zaal heeft een eigen status-map; we luisteren naar allemaal
+	task.spawn(function()
+		local folder = ReplicatedStorage:WaitForChild("RoomState")
+		local function watch(roomState: Instance)
+			roomState.AttributeChanged:Connect(updateRound)
+		end
+		for _, roomState in folder:GetChildren() do
+			watch(roomState)
+		end
+		folder.ChildAdded:Connect(watch)
+		updateRound()
+	end)
 	updateRound()
-	player.AttributeChanged:Connect(updatePlayerStats)
+	player.AttributeChanged:Connect(function(name)
+		if name == "Room" then
+			updateRound()
+		end
+		updatePlayerStats()
+	end)
 	updatePlayerStats()
 end
 
@@ -4964,7 +6156,7 @@ return Hud
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="21">
+  <Item class="Workspace" referent="22">
     <Properties>
       <string name="Name">Workspace</string>
       <bool name="NeedsPivotMigration">false</bool>

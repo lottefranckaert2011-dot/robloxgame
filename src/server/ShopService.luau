@@ -7,7 +7,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local KeyService = require(script.Parent.KeyService)
-local BookService = require(script.Parent.BookService)
+local RoomService = require(script.Parent.RoomService)
 
 local ShopService = {}
 
@@ -96,11 +96,13 @@ local function useAbility(player: Player, id: string)
 	end
 	if id == "Assemble" then
 		mine[id] = now + info.Cooldown
-		local got = BookService.Assemble(player, Config.AssembleRadius)
+		local books = RoomService.GetBooks(player)
+		local got = if books then books:Assemble(player, Config.AssembleRadius) else 0
 		notify(player, if got > 0 then string.format("🧲 %d boek%s verzameld!", got, if got == 1 then "" else "en") else "🧲 Geen boeken in de buurt (of je handen zijn vol).", Color3.fromRGB(150, 210, 255))
 	elseif id == "AutoShelf" then
 		mine[id] = now + info.Cooldown
-		local placed = BookService.AutoShelf(player)
+		local books = RoomService.GetBooks(player)
+		local placed = if books then books:AutoShelf(player) else 0
 		notify(player, if placed > 0 then string.format("✨ %d boek%s teruggezet!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
 	end
 end
@@ -127,11 +129,12 @@ function ShopService.Init()
 				local profile = DataService.Get(player)
 				local level = if profile then profile.Assistant else 0
 				local levelInfo = Config.Assistant.Levels[level]
-				if levelInfo and BookService.Active then
+				local books = RoomService.GetBooks(player)
+				if levelInfo and books and books.Active then
 					timers[player] = (timers[player] or 0) + 1
 					if timers[player] >= levelInfo.Interval then
 						timers[player] = 0
-						task.spawn(BookService.AssistantPlace, player)
+						task.spawn(books.AssistantPlace, books, player)
 					end
 				end
 			end

@@ -33,6 +33,8 @@ local ROUND = Enum.Font.FredokaOne
 
 local gui: ScreenGui
 local timerLabel: TextLabel
+local countersHolder: Frame
+local leaveButton: TextButton
 local placedLabel: TextLabel
 local carriedLabel: TextLabel
 local sectionsLeftLabel: TextLabel
@@ -633,6 +635,7 @@ local function buildBottomRight()
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
+	countersHolder = holder
 	sectionsLeftLabel = outlined({
 		Size = UDim2.new(1, 0, 0, 56),
 		Font = SERIF,
@@ -730,6 +733,27 @@ local function buildTopLeft()
 		stroke(icon, info.Color, 2)
 		keyIcons[info.Id] = icon
 	end
+end
+
+local function buildLeaveButton()
+	leaveButton = make("TextButton", {
+		Name = "Leave",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 70),
+		Size = UDim2.fromOffset(220, 46),
+		BackgroundColor3 = NAVY,
+		Font = SERIF,
+		TextSize = 26,
+		TextColor3 = WHITE,
+		Text = "🚪 Terug naar de hal",
+		Visible = false,
+		Parent = gui,
+	})
+	corner(leaveButton, 8)
+	stroke(leaveButton, NAVY_EDGE, 2.5)
+	leaveButton.Activated:Connect(function()
+		Remotes.Action:FireServer("Leave")
+	end)
 end
 
 local function buildTouchButtons()
@@ -1027,12 +1051,36 @@ local function updatePlayerStats()
 	refreshOpenPanel()
 end
 
+-- De status-map van de zaal waar je nu in bent (nil = in de hal)
+local function currentRoomState(): Instance?
+	local id = player:GetAttribute("Room")
+	local folder = ReplicatedStorage:FindFirstChild("RoomState")
+	if type(id) ~= "string" or not folder then
+		return nil
+	end
+	return folder:FindFirstChild(id)
+end
+
 local function updateRound()
-	local state = Workspace:GetAttribute("RoundState") or "Waiting"
-	local timeLeft = Workspace:GetAttribute("TimeLeft") or 0
-	local placed = Workspace:GetAttribute("Placed") or 0
-	local total = Workspace:GetAttribute("Total") or Config.TotalBooks()
-	local message = Workspace:GetAttribute("Message") or ""
+	local roomState = currentRoomState()
+	if not roomState then
+		-- In de hal
+		timerLabel.Visible = false
+		countersHolder.Visible = false
+		leaveButton.Visible = false
+		bigBanner.Visible = false
+		objectiveLabel.Text = "Kies een zaal!"
+		return
+	end
+	timerLabel.Visible = true
+	countersHolder.Visible = true
+	leaveButton.Visible = true
+
+	local state = roomState:GetAttribute("RoundState") or "Idle"
+	local timeLeft = roomState:GetAttribute("TimeLeft") or 0
+	local placed = roomState:GetAttribute("Placed") or 0
+	local total = roomState:GetAttribute("Total") or 0
+	local message = roomState:GetAttribute("Message") or ""
 
 	timerLabel.Text = formatTime(timeLeft)
 	timerLabel.TextColor3 = if state == "Playing" and timeLeft <= 60 then Color3.fromRGB(255, 90, 90) else WHITE
@@ -1042,8 +1090,8 @@ local function updateRound()
 		local left = total - placed
 		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
 		objectiveLabel.Text = "Ruim alle kasten op"
-	elseif state == "Intermission" then
-		sectionsLeftLabel.Text = "de bibliotheek gaat zo open..."
+	elseif state == "Starting" then
+		sectionsLeftLabel.Text = "de zaal gaat zo open..."
 		objectiveLabel.Text = message
 	else
 		sectionsLeftLabel.Text = ""
@@ -1082,6 +1130,7 @@ function Hud.Init()
 	buildBottomLeft()
 	buildBottomRight()
 	buildTopLeft()
+	buildLeaveButton()
 	buildTouchButtons()
 	buildShopPanel()
 	buildMagicPanel()
@@ -1091,11 +1140,25 @@ function Hud.Init()
 	fitToScreen()
 	Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitToScreen)
 
-	for _, name in { "RoundState", "TimeLeft", "Placed", "Total", "Message" } do
-		Workspace:GetAttributeChangedSignal(name):Connect(updateRound)
-	end
+	-- Elke zaal heeft een eigen status-map; we luisteren naar allemaal
+	task.spawn(function()
+		local folder = ReplicatedStorage:WaitForChild("RoomState")
+		local function watch(roomState: Instance)
+			roomState.AttributeChanged:Connect(updateRound)
+		end
+		for _, roomState in folder:GetChildren() do
+			watch(roomState)
+		end
+		folder.ChildAdded:Connect(watch)
+		updateRound()
+	end)
 	updateRound()
-	player.AttributeChanged:Connect(updatePlayerStats)
+	player.AttributeChanged:Connect(function(name)
+		if name == "Room" then
+			updateRound()
+		end
+		updatePlayerStats()
+	end)
 	updatePlayerStats()
 end
 

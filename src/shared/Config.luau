@@ -9,6 +9,22 @@ export type Section = {
 	Titles: { string },
 }
 
+export type RoomInfo = {
+	Id: string,
+	Name: string,
+	Description: string,
+	Color: Color3,
+	Floors: number, -- 1 of 2 verdiepingen
+	MaxSections: number, -- hoeveel kastsecties (van 1A af)
+	BooksPerSection: number,
+	RoundTime: number,
+	Monster: boolean,
+	MonsterSpeed: number, -- vermenigvuldiger voor de snelheid van het monster
+	Dark: boolean, -- donkere nachtmerrie-sfeer
+	CoinMultiplier: number,
+	Offset: Vector3, -- waar de zaal in de wereld staat
+}
+
 export type KeyInfo = {
 	Id: string,
 	Name: string,
@@ -20,11 +36,9 @@ local Config = {}
 
 Config.GameName = "Clean The Library 📖 [Nightmare]"
 
--- Ronde
-Config.RoundTime = 20 * 60 -- seconden om de bibliotheek op te ruimen
-Config.IntermissionTime = 15
-Config.EndScreenTime = 10
-Config.BooksPerSection = 8
+-- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
+Config.StartCountdown = 10 -- seconden tussen binnenkomen en de start
+Config.EndScreenTime = 8 -- daarna ga je terug naar de hal
 Config.RespawnTime = 4
 
 -- Speler
@@ -271,6 +285,79 @@ Config.Sections = {
 	{ Code = "2Q", Name = "Verboden Archief", Floor = 2, Titles = { "Shhhhh...", "De Regels van de Bibliothecaresse", "Nooit Meer Rennen" } },
 } :: { Section }
 
+-- De zalen waaruit je in de hal kunt kiezen
+Config.Rooms = {
+	{
+		Id = "Starter",
+		Name = "Starterzaal",
+		Description = "1 verdieping · 12 kasten · geen monster",
+		Color = Color3.fromRGB(90, 210, 120),
+		Floors = 1,
+		MaxSections = 12,
+		BooksPerSection = 6,
+		RoundTime = 12 * 60,
+		Monster = false,
+		MonsterSpeed = 1,
+		Dark = false,
+		CoinMultiplier = 1,
+		Offset = Vector3.new(1000, 0, 0),
+	},
+	{
+		Id = "Classic",
+		Name = "Grote Zaal",
+		Description = "2 verdiepingen · 31 kasten · De Bibliothecaresse",
+		Color = Color3.fromRGB(90, 160, 255),
+		Floors = 2,
+		MaxSections = 31,
+		BooksPerSection = 8,
+		RoundTime = 20 * 60,
+		Monster = true,
+		MonsterSpeed = 1,
+		Dark = false,
+		CoinMultiplier = 1.5,
+		Offset = Vector3.new(2000, 0, 0),
+	},
+	{
+		Id = "Nightmare",
+		Name = "Nachtmerriezaal",
+		Description = "Pikdonker · sneller monster · dubbele munten",
+		Color = Color3.fromRGB(220, 60, 90),
+		Floors = 2,
+		MaxSections = 31,
+		BooksPerSection = 8,
+		RoundTime = 20 * 60,
+		Monster = true,
+		MonsterSpeed = 1.2,
+		Dark = true,
+		CoinMultiplier = 2,
+		Offset = Vector3.new(3000, 0, 0),
+	},
+} :: { RoomInfo }
+
+function Config.FindRoom(id: string): RoomInfo?
+	for _, room in Config.Rooms do
+		if room.Id == id then
+			return room
+		end
+	end
+	return nil
+end
+
+-- De kastsecties die in een zaal staan (met hun index voor de kleur)
+function Config.RoomSections(room: RoomInfo): { { Section: Section, Index: number } }
+	local list = {}
+	for index, section in Config.Sections do
+		if #list < room.MaxSections and section.Floor <= room.Floors then
+			table.insert(list, { Section = section, Index = index })
+		end
+	end
+	return list
+end
+
+function Config.RoomTotalBooks(room: RoomInfo): number
+	return #Config.RoomSections(room) * room.BooksPerSection
+end
+
 -- Kleur per sectie (verdeeld over de regenboog), gebruikt in het scherm
 function Config.SectionColor(index: number): Color3
 	return Color3.fromHSV(((index - 1) * 0.618) % 1, 0.55, 0.95)
@@ -285,8 +372,5 @@ function Config.FindSection(code: string): (Section?, number?)
 	return nil, nil
 end
 
-function Config.TotalBooks(): number
-	return #Config.Sections * Config.BooksPerSection
-end
 
 return Config

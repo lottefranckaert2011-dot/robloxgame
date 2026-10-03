@@ -1,12 +1,14 @@
--- Effecten: flikkerende lampjes, rode rand en hartslag-schudden als
--- het monster dichtbij is, de jumpscare, en gevonden sleutels verbergen.
+-- Effecten: donkere sfeer + zaklamp in de Nachtmerriezaal, flikkerende lampjes,
+-- rode rand en hartslag-schudden als het monster dichtbij is, de jumpscare,
+-- gevonden sleutels verbergen en de kramen in de hal.
 
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local player = Players.LocalPlayer
@@ -16,10 +18,79 @@ local Effects = {}
 
 local Hud
 local flickerLights: { { part: BasePart, light: Light } } = {}
+local savedLighting: { [string]: any }? = nil
 
-local function collectFlickers(library: Instance)
+local DARK_LIGHTING = {
+	ClockTime = 0,
+	Brightness = 0,
+	Ambient = Color3.fromRGB(30, 26, 40),
+	OutdoorAmbient = Color3.fromRGB(10, 10, 16),
+	EnvironmentDiffuseScale = 0,
+	EnvironmentSpecularScale = 0,
+	FogColor = Color3.fromRGB(6, 5, 10),
+	FogStart = 10,
+	FogEnd = 110,
+}
+
+local function roomModel(): Instance?
+	local id = player:GetAttribute("Room")
+	local rooms = Workspace:FindFirstChild("Rooms")
+	if type(id) ~= "string" or not rooms then
+		return nil
+	end
+	return rooms:FindFirstChild(id)
+end
+
+-- Nachtmerrie-sfeer aan of uit (alleen voor deze speler)
+local function setDark(dark: boolean)
+	if dark and not savedLighting then
+		local saved = {}
+		for key, value in DARK_LIGHTING do
+			saved[key] = (Lighting :: any)[key]
+			;(Lighting :: any)[key] = value
+		end
+		savedLighting = saved
+	elseif not dark and savedLighting then
+		for key, value in savedLighting do
+			(Lighting :: any)[key] = value
+		end
+		savedLighting = nil
+	end
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atmosphere then
+		atmosphere.Density = if dark then 0 else 0.12
+	end
+end
+
+-- Een zaklamp die alleen jij ziet, in donkere zalen
+local function updateFlashlight(dark: boolean)
+	local character = player.Character
+	local head = character and character:FindFirstChild("Head")
+	if not head then
+		return
+	end
+	local light = head:FindFirstChild("LocalFlashlight")
+	if dark and not light then
+		local spot = Instance.new("SpotLight")
+		spot.Name = "LocalFlashlight"
+		spot.Range = 45
+		spot.Angle = 55
+		spot.Brightness = 3
+		spot.Shadows = true
+		spot.Color = Color3.fromRGB(255, 245, 220)
+		spot.Face = Enum.NormalId.Front
+		spot.Parent = head
+	elseif not dark and light then
+		light:Destroy()
+	end
+end
+
+local function collectFlickers(room: Instance?)
 	table.clear(flickerLights)
-	for _, d in library:GetDescendants() do
+	if not room then
+		return
+	end
+	for _, d in room:GetDescendants() do
 		if d:IsA("BasePart") and d:GetAttribute("Flicker") then
 			local light = d:FindFirstChildWhichIsA("Light")
 			if light then
@@ -45,48 +116,82 @@ local function flickerLoop()
 	end
 end
 
--- Sleutels die je al hebt worden (alleen voor jou) onzichtbaar
-local function updateKeys(library: Instance)
-	local keys = library:FindFirstChild("Keys")
-	if not keys then
+local function onRoomChanged()
+	local room = roomModel()
+	local dark = room ~= nil and room:GetAttribute("Dark") == true
+	setDark(dark)
+	updateFlashlight(dark)
+	collectFlickers(if dark then room else nil)
+end
+
+-- Sleutels die je al hebt worden (alleen voor jou) onzichtbaar, in alle zalen
+local function updateKeys()
+	local rooms = Workspace:FindFirstChild("Rooms")
+	if not rooms then
 		return
 	end
-	for _, key in keys:GetChildren() do
-		if key:IsA("BasePart") then
-			local has = player:GetAttribute("Key_" .. tostring(key:GetAttribute("KeyId"))) == true
-			key.LocalTransparencyModifier = if has then 1 else 0
-			local prompt = key:FindFirstChildOfClass("ProximityPrompt")
-			if prompt then
-				prompt.Enabled = not has
-			end
-			local light = key:FindFirstChildWhichIsA("Light")
-			if light then
-				light.Enabled = not has
+	for _, room in rooms:GetChildren() do
+		local keys = room:FindFirstChild("Keys")
+		if keys then
+			for _, key in keys:GetChildren() do
+				if key:IsA("BasePart") then
+					local has = player:GetAttribute("Key_" .. tostring(key:GetAttribute("KeyId"))) == true
+					key.LocalTransparencyModifier = if has then 1 else 0
+					local prompt = key:FindFirstChildOfClass("ProximityPrompt")
+					if prompt then
+						prompt.Enabled = not has
+					end
+					local light = key:FindFirstChildWhichIsA("Light")
+					if light then
+						light.Enabled = not has
+					end
+				end
 			end
 		end
 	end
 end
 
+local function findMonster(room: Instance?): BasePart?
+	if not room then
+		return nil
+	end
+	for _, child in room:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("IsMonster") then
+			return child:FindFirstChild("HumanoidRootPart") :: BasePart?
+		end
+	end
+	return nil
+end
+
 function Effects.Init(hud)
 	Hud = hud
 
-	local library = Workspace:WaitForChild("Library")
-	collectFlickers(library)
+	Workspace:WaitForChild("Rooms")
 	task.spawn(flickerLoop)
+	updateKeys()
+	onRoomChanged()
 
-	updateKeys(library)
 	player.AttributeChanged:Connect(function(name)
 		if string.sub(name, 1, 4) == "Key_" then
-			updateKeys(library)
+			updateKeys()
 		elseif name == "Hidden" then
 			Hud.SetHidden(player:GetAttribute("Hidden") == true)
+		elseif name == "Room" then
+			onRoomChanged()
 		end
 	end)
-	-- De sleutels kunnen net na de bibliotheek binnenkomen
-	library.ChildAdded:Connect(function(child)
-		if child.Name == "Keys" then
-			task.wait(0.5)
-			updateKeys(library)
+	player.CharacterAdded:Connect(function(character)
+		character:WaitForChild("Head")
+		onRoomChanged()
+	end)
+	-- De sleutels komen net na de zalen binnen
+	task.delay(2, updateKeys)
+
+	-- Kramen in de hal openen een venster
+	ProximityPromptService.PromptTriggered:Connect(function(prompt)
+		local panel = prompt:GetAttribute("OpenPanel")
+		if type(panel) == "string" then
+			Hud.TogglePanel(panel)
 		end
 	end)
 
@@ -100,10 +205,9 @@ function Effects.Init(hud)
 
 	-- Hoe dichter het monster, hoe roder het scherm en hoe meer het beeld trilt
 	RunService:BindToRenderStep("MonsterDanger", Enum.RenderPriority.Camera.Value + 1, function()
-		local monster = Workspace:FindFirstChild(Config.Monster.Name)
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local monsterRoot = monster and monster:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local monsterRoot = findMonster(roomModel())
 		if not root or not monsterRoot then
 			Hud.SetDanger(0)
 			return
