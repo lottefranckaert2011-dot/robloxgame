@@ -1,10 +1,11 @@
--- Besturing: sprinten met uithoudingsvermogen, zaklamp, boeken laten vallen
--- en de twee magische vaardigheden (Inzicht en Kastgids).
+-- Besturing: sprinten met uithoudingsvermogen, boeken laten vallen,
+-- menu-toetsen (F/C/M/Z) en de vier magie-vakjes (1-4).
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -19,8 +20,7 @@ local Hud
 local stamina = Config.MaxStamina
 local sprintHeld = false
 local sprintToggled = false -- voor de knop op mobiel
-local flashlightOn = false
-local cooldownUntil: { [string]: number } = { Insight = 0, ShelfGuide = 0 }
+local cooldownUntil: { [string]: number } = {}
 
 local function getHumanoid(): Humanoid?
 	local character = player.Character
@@ -32,16 +32,6 @@ local function getRoot(): BasePart?
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function setFlashlight(on: boolean)
-	flashlightOn = on
-	Hud.SetActive("Flashlight", on)
-	Remotes.Action:FireServer("Flashlight", on)
-end
-
-local function toggleFlashlight()
-	setFlashlight(not flashlightOn)
-end
-
 local function drop()
 	if #Controls.Inventory > 0 then
 		Remotes.Action:FireServer("Drop")
@@ -49,22 +39,16 @@ local function drop()
 end
 
 -- Inzicht: laat even alle losse boeken in de buurt oplichten
-local function insight()
-	local cfg = Config.Abilities.Insight
-	local now = os.clock()
-	if now < cooldownUntil.Insight then
-		return
-	end
+local function insight(): boolean
 	local root = getRoot()
 	local books = Workspace:FindFirstChild("Books")
 	if not root or not books then
-		return
+		return false
 	end
-	cooldownUntil.Insight = now + cfg.Cooldown
 	local markers = {}
 	local found = 0
 	for _, book in books:GetChildren() do
-		if book:IsA("BasePart") and (book.Position - root.Position).Magnitude <= cfg.Radius then
+		if book:IsA("BasePart") and (book.Position - root.Position).Magnitude <= Config.InsightRadius then
 			found += 1
 			local bb = Instance.new("BillboardGui")
 			bb.Name = "InsightMarker"
@@ -74,8 +58,8 @@ local function insight()
 			bb.LightInfluence = 0
 			local label = Instance.new("TextLabel")
 			label.Size = UDim2.fromScale(1, 1)
-			label.BackgroundColor3 = Color3.fromRGB(120, 200, 255)
-			label.BackgroundTransparency = 0.25
+			label.BackgroundColor3 = Color3.fromRGB(255, 225, 120)
+			label.BackgroundTransparency = 0.15
 			label.Font = Enum.Font.GothamBlack
 			label.TextSize = 13
 			label.TextColor3 = Color3.new(0, 0, 0)
@@ -89,25 +73,21 @@ local function insight()
 			table.insert(markers, bb)
 		end
 	end
-	Hud.Notify(string.format("👁 Inzicht: %d boeken in de buurt", found), Color3.fromRGB(120, 200, 255))
-	task.delay(cfg.Duration, function()
+	Hud.Notify(string.format("👁 Inzicht: %d boeken in de buurt", found), Color3.fromRGB(255, 225, 120))
+	task.delay(Config.InsightDuration, function()
 		for _, bb in markers do
 			bb:Destroy()
 		end
 	end)
+	return true
 end
 
 -- Kastgids: een lichtstraal naar de kast van het eerste boek dat je draagt
-local function shelfGuide()
-	local cfg = Config.Abilities.ShelfGuide
-	local now = os.clock()
-	if now < cooldownUntil.ShelfGuide then
-		return
-	end
+local function shelfGuide(): boolean
 	local book = Controls.Inventory[1]
 	if not book then
-		Hud.Notify("Pak eerst een boek op.", Color3.fromRGB(200, 200, 200))
-		return
+		Hud.Notify("Pak eerst een boek op.", Color3.fromRGB(220, 220, 220))
+		return false
 	end
 	local root = getRoot()
 	local library = Workspace:FindFirstChild("Library")
@@ -115,9 +95,8 @@ local function shelfGuide()
 	local sectionModel = sections and sections:FindFirstChild("Section_" .. book.Code)
 	local zone = sectionModel and sectionModel:FindFirstChild("PromptZone") :: BasePart?
 	if not root or not zone then
-		return
+		return false
 	end
-	cooldownUntil.ShelfGuide = now + cfg.Cooldown
 	local section, index = Config.FindSection(book.Code)
 	local color = if index then Config.SectionColor(index) else Color3.new(1, 1, 1)
 
@@ -139,13 +118,13 @@ local function shelfGuide()
 
 	local bb = Instance.new("BillboardGui")
 	bb.AlwaysOnTop = true
-	bb.Size = UDim2.fromOffset(200, 50)
-	bb.StudsOffset = Vector3.new(0, 7, 0)
+	bb.Size = UDim2.fromOffset(220, 50)
+	bb.StudsOffset = Vector3.new(0, 8, 0)
 	bb.Adornee = zone
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.Creepster
+	label.Font = Enum.Font.Garamond
 	label.TextScaled = true
 	label.TextColor3 = color
 	label.TextStrokeTransparency = 0.2
@@ -154,12 +133,40 @@ local function shelfGuide()
 	bb.Parent = player:WaitForChild("PlayerGui")
 
 	Hud.Notify("🧭 Volg het licht naar " .. book.Code, color)
-	task.delay(cfg.Duration, function()
+	task.delay(Config.ShelfGuideDuration, function()
 		beam:Destroy()
 		a0:Destroy()
 		a1:Destroy()
 		bb:Destroy()
 	end)
+	return true
+end
+
+local function useAbility(id: string)
+	local info = Config.FindMagic(id)
+	if not info then
+		return
+	end
+	if not player:GetAttribute("Magic_" .. id) then
+		Hud.Notify(string.format("🔒 %s is nog op slot. Koop het bij Magie (C).", info.Name), Color3.fromRGB(255, 200, 120))
+		return
+	end
+	local now = os.clock()
+	if now < (cooldownUntil[id] or 0) then
+		return
+	end
+	local used = true
+	if id == "Insight" then
+		used = insight()
+	elseif id == "ShelfGuide" then
+		used = shelfGuide()
+	else
+		-- Verzamelen en Auto-plaatsen gebeuren op de server
+		Remotes.Action:FireServer("Ability", id)
+	end
+	if used then
+		cooldownUntil[id] = now + info.Cooldown
+	end
 end
 
 local function bindKey(name: string, callback: () -> (), ...: Enum.KeyCode)
@@ -174,23 +181,42 @@ end
 function Controls.Init(hud)
 	Hud = hud
 
+	-- Geen rugzak-balk: de cijfertoetsen zijn voor magie
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	end)
+
 	ContextActionService:BindAction("Sprint", function(_, inputState)
 		sprintHeld = inputState == Enum.UserInputState.Begin
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift, Enum.KeyCode.ButtonL3)
-	bindKey("Flashlight", toggleFlashlight, Enum.KeyCode.F, Enum.KeyCode.ButtonY)
 	bindKey("DropBooks", drop, Enum.KeyCode.G, Enum.KeyCode.ButtonB)
-	bindKey("Insight", insight, Config.Abilities.Insight.Key, Enum.KeyCode.ButtonL1)
-	bindKey("ShelfGuide", shelfGuide, Config.Abilities.ShelfGuide.Key, Enum.KeyCode.ButtonR1)
 
-	Hud.Buttons.Sprint.Activated:Connect(function()
-		sprintToggled = not sprintToggled
-		Hud.SetActive("Sprint", sprintToggled)
-	end)
-	Hud.Buttons.Flashlight.Activated:Connect(toggleFlashlight)
-	Hud.Buttons.Drop.Activated:Connect(drop)
-	Hud.Buttons.Insight.Activated:Connect(insight)
-	Hud.Buttons.ShelfGuide.Activated:Connect(shelfGuide)
+	for name, key in Config.MenuKeys do
+		bindKey("Menu" .. name, function()
+			Hud.TogglePanel(name)
+		end, key)
+	end
+
+	local gamepad = { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1, Enum.KeyCode.ButtonL2, Enum.KeyCode.ButtonR2 }
+	for i, info in Config.Magic do
+		bindKey("Magic" .. info.Id, function()
+			useAbility(info.Id)
+		end, info.Key, gamepad[i])
+		Hud.AbilitySlots[info.Id].Activated:Connect(function()
+			useAbility(info.Id)
+		end)
+	end
+
+	if Hud.Buttons.Sprint then
+		Hud.Buttons.Sprint.Activated:Connect(function()
+			sprintToggled = not sprintToggled
+			Hud.SetActive("Sprint", sprintToggled)
+		end)
+	end
+	if Hud.Buttons.Drop then
+		Hud.Buttons.Drop.Activated:Connect(drop)
+	end
 
 	Remotes.Inventory.OnClientEvent:Connect(function(list, capacity)
 		Controls.Inventory = list
@@ -199,17 +225,14 @@ function Controls.Init(hud)
 
 	player.CharacterAdded:Connect(function()
 		stamina = Config.MaxStamina
-		flashlightOn = false
-		Hud.SetActive("Flashlight", false)
 	end)
 
 	RunService.Heartbeat:Connect(function(dt)
-		local humanoid = getHumanoid()
 		local now = os.clock()
-		for name, cfg in Config.Abilities do
-			local left = cooldownUntil[name] - now
-			Hud.SetCooldown(name, left / cfg.Cooldown)
+		for _, info in Config.Magic do
+			Hud.SetCooldown(info.Id, ((cooldownUntil[info.Id] or 0) - now) / info.Cooldown)
 		end
+		local humanoid = getHumanoid()
 		if not humanoid then
 			return
 		end
@@ -221,8 +244,9 @@ function Controls.Init(hud)
 		else
 			stamina = math.min(Config.MaxStamina, stamina + Config.StaminaRegen * dt)
 		end
+		local walkSpeed = player:GetAttribute("WalkSpeed") or Config.WalkSpeed
 		local sprintSpeed = player:GetAttribute("SprintSpeed") or Config.SprintSpeed
-		humanoid.WalkSpeed = if sprinting then sprintSpeed else Config.WalkSpeed
+		humanoid.WalkSpeed = if sprinting then sprintSpeed else walkSpeed
 		Hud.SetStamina(stamina / Config.MaxStamina)
 	end)
 end

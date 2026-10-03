@@ -11,22 +11,33 @@ local DataService = require(script.Parent.DataService)
 
 local KeyService = {}
 
+-- Berekent alle upgrades (sleutels, winkel, magie, assistent) en zet ze als attributen
 local function applyUpgrades(player: Player)
 	local profile = DataService.Get(player)
 	local keys = if profile then profile.Keys else {}
+	local upgrades = if profile then profile.Upgrades else {}
 	for _, info in Config.Keys do
 		player:SetAttribute("Key_" .. info.Id, keys[info.Id] == true)
 	end
+	for _, item in Config.Shop do
+		player:SetAttribute("Up_" .. item.Id, upgrades[item.Id] or 0)
+	end
+	for _, info in Config.Magic do
+		player:SetAttribute("Magic_" .. info.Id, profile ~= nil and profile.Magic[info.Id] == true)
+	end
+	player:SetAttribute("Assistant", if profile then profile.Assistant else 0)
 
-	local capacity = Config.BaseCapacity
+	local capacity = Config.BaseCapacity + (upgrades.Capacity or 0)
 	if keys.Golden then
 		capacity += 3
 	end
 	if keys.Azure then
 		capacity += 3
 	end
+	local bonusSpeed = (upgrades.Speed or 0) * Config.SpeedPerLevel
 	player:SetAttribute("Capacity", capacity)
-	player:SetAttribute("SprintSpeed", if keys.Emerald then Config.EmeraldSprintSpeed else Config.SprintSpeed)
+	player:SetAttribute("WalkSpeed", Config.WalkSpeed + bonusSpeed)
+	player:SetAttribute("SprintSpeed", (if keys.Emerald then Config.EmeraldSprintSpeed else Config.SprintSpeed) + bonusSpeed)
 	player:SetAttribute("JumpHeight", if keys.Crimson then Config.CrimsonJumpHeight else Config.BaseJumpHeight)
 
 	local character = player.Character
@@ -95,6 +106,10 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 		{ CFrame = p.CFrame * CFrame.new(0, 0.6, 0) * CFrame.Angles(0, math.rad(180), 0) }
 	)
 	tween:Play()
+end
+
+function KeyService.Refresh(player: Player)
+	applyUpgrades(player)
 end
 
 function KeyService.Init(library)

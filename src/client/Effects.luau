@@ -1,4 +1,4 @@
--- Griezelige effecten: flikkerende lampen, rode rand en hartslag-schudden als
+-- Effecten: flikkerende lampjes, rode rand en hartslag-schudden als
 -- het monster dichtbij is, de jumpscare, en gevonden sleutels verbergen.
 
 local Players = game:GetService("Players")
@@ -115,7 +115,7 @@ function Effects.Init(hud)
 		-- Hartslag
 		local pulse = 0.75 + 0.25 * math.sin(os.clock() * (6 + danger * 8))
 		Hud.SetDanger(danger * pulse)
-		if danger > 0.55 and not player:GetAttribute("Hidden") then
+		if danger > 0.55 and Hud.Settings.Shake and not player:GetAttribute("Hidden") then
 			local shake = (danger - 0.55) * 0.35
 			camera.CFrame *= CFrame.Angles(
 				math.rad((math.random() - 0.5) * shake * 4),

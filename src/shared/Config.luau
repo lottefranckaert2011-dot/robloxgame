@@ -49,7 +49,6 @@ Config.Monster = {
 	ChaseSpeedStart = 17,
 	ChaseSpeedEnd = 21, -- sneller naarmate er meer boeken terug staan
 	SightRange = 55,
-	SightRangeFlashlight = 85, -- met je zaklamp aan zie je meer, maar zij ziet jou ook sneller!
 	FieldOfView = 130, -- graden
 	CloseDetectRange = 12, -- zo dichtbij voelt ze je altijd
 	HearSprintRange = 45,
@@ -59,11 +58,133 @@ Config.Monster = {
 	SpawnDelay = 20, -- seconden na de start voor ze verschijnt
 }
 
--- Magische vaardigheden (client)
-Config.Abilities = {
-	Insight = { Key = Enum.KeyCode.Q, Cooldown = 30, Duration = 8, Radius = 70 },
-	ShelfGuide = { Key = Enum.KeyCode.T, Cooldown = 20, Duration = 12 },
+export type MagicInfo = {
+	Id: string,
+	Name: string,
+	Icon: string,
+	Description: string,
+	Cost: number,
+	Cooldown: number,
+	Key: Enum.KeyCode,
 }
+
+-- Magie: vier vaardigheden (toetsen 1-4) die je koopt met munten
+Config.Magic = {
+	{
+		Id = "Insight",
+		Name = "Inzicht",
+		Icon = "👁",
+		Description = "Laat alle boeken in de buurt oplichten",
+		Cost = 20,
+		Cooldown = 25,
+		Key = Enum.KeyCode.One,
+	},
+	{
+		Id = "ShelfGuide",
+		Name = "Kastgids",
+		Icon = "🧭",
+		Description = "Een lichtstraal wijst naar de kast van je boek",
+		Cost = 40,
+		Cooldown = 15,
+		Key = Enum.KeyCode.Two,
+	},
+	{
+		Id = "Assemble",
+		Name = "Verzamelen",
+		Icon = "🧲",
+		Description = "Trekt de dichtstbijzijnde boeken naar je toe",
+		Cost = 120,
+		Cooldown = 30,
+		Key = Enum.KeyCode.Three,
+	},
+	{
+		Id = "AutoShelf",
+		Name = "Auto-plaatsen",
+		Icon = "✨",
+		Description = "Al je boeken vliegen vanzelf naar de goede kast",
+		Cost = 250,
+		Cooldown = 60,
+		Key = Enum.KeyCode.Four,
+	},
+} :: { MagicInfo }
+
+Config.InsightDuration = 8
+Config.InsightRadius = 70
+Config.ShelfGuideDuration = 12
+Config.AssembleRadius = 35
+
+export type ShopItem = {
+	Id: string,
+	Name: string,
+	Icon: string,
+	Description: string,
+	BaseCost: number,
+	CostGrowth: number,
+	MaxLevel: number,
+}
+
+-- Winkel: upgrades die je blijft houden
+Config.Shop = {
+	{
+		Id = "Capacity",
+		Name = "Grotere Tas",
+		Icon = "🎒",
+		Description = "+1 boek dragen",
+		BaseCost = 40,
+		CostGrowth = 1.6,
+		MaxLevel = 6,
+	},
+	{
+		Id = "Speed",
+		Name = "Snelle Schoenen",
+		Icon = "👟",
+		Description = "+1,5 loopsnelheid",
+		BaseCost = 50,
+		CostGrowth = 1.7,
+		MaxLevel = 5,
+	},
+} :: { ShopItem }
+Config.SpeedPerLevel = 1.5
+
+-- Assistent: een magische uil die zelf boeken terugzet
+Config.Assistant = {
+	Name = "Uil Oehoe",
+	Levels = {
+		{ Cost = 150, Interval = 20 },
+		{ Cost = 400, Interval = 13 },
+		{ Cost = 900, Interval = 8 },
+	},
+}
+
+-- Menu-toetsen (zoals in het origineel)
+Config.MenuKeys = {
+	Shop = Enum.KeyCode.F,
+	Magic = Enum.KeyCode.C,
+	Assistant = Enum.KeyCode.M,
+	Settings = Enum.KeyCode.Z,
+}
+
+function Config.ShopCost(item: ShopItem, level: number): number
+	return math.floor(item.BaseCost * item.CostGrowth ^ level)
+end
+
+function Config.FindMagic(id: string): MagicInfo?
+	for _, info in Config.Magic do
+		if info.Id == id then
+			return info
+		end
+	end
+	return nil
+end
+
+function Config.FindShopItem(id: string): ShopItem?
+	for _, item in Config.Shop do
+		if item.Id == id then
+			return item
+		end
+	end
+	return nil
+end
 
 -- De 4 verborgen sleutels die permanente upgrades geven
 Config.Keys = {
@@ -102,7 +223,7 @@ Config.Map = {
 	GridX = { -80, -40, 0, 40, 80 },
 	GridZ = { 35, 5, -25, -55 },
 	CaseLength = 30,
-	CaseHeight = 10,
+	CaseHeight = 11,
 	CaseDepth = 3,
 }
 
@@ -150,9 +271,9 @@ Config.Sections = {
 	{ Code = "2Q", Name = "Verboden Archief", Floor = 2, Titles = { "Shhhhh...", "De Regels van de Bibliothecaresse", "Nooit Meer Rennen" } },
 } :: { Section }
 
--- Kleur per sectie (verdeeld over de regenboog)
+-- Kleur per sectie (verdeeld over de regenboog), gebruikt in het scherm
 function Config.SectionColor(index: number): Color3
-	return Color3.fromHSV(((index - 1) * 0.618) % 1, 0.65, 0.95)
+	return Color3.fromHSV(((index - 1) * 0.618) % 1, 0.55, 0.95)
 end
 
 function Config.FindSection(code: string): (Section?, number?)

@@ -297,8 +297,7 @@ local function canSee(player: Player, params: RaycastParams): boolean
 	local eye = head.Position
 	local offset = hrp.Position - eye
 	local dist = offset.Magnitude
-	local range = if player:GetAttribute("Flashlight") then M.SightRangeFlashlight else M.SightRange
-	if dist > range then
+	if dist > M.SightRange then
 		return false
 	end
 	if dist > M.CloseDetectRange then

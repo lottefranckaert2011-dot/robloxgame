@@ -11,6 +11,9 @@ export type Profile = {
 	Keys: { [string]: boolean },
 	BestTime: number?,
 	Wins: number,
+	Upgrades: { [string]: number }, -- winkel-upgrades en hun niveau
+	Magic: { [string]: boolean }, -- gekochte vaardigheden
+	Assistant: number, -- niveau van de assistent (0 = geen)
 }
 
 local DataService = {}
@@ -31,7 +34,7 @@ do
 end
 
 local function defaultProfile(): Profile
-	return { Coins = 0, Keys = {}, BestTime = nil, Wins = 0 }
+	return { Coins = 0, Keys = {}, BestTime = nil, Wins = 0, Upgrades = {}, Magic = {}, Assistant = 0 }
 end
 
 local function load(player: Player): Profile
@@ -44,9 +47,20 @@ local function load(player: Player): Profile
 			profile.Coins = tonumber(data.Coins) or 0
 			profile.Wins = tonumber(data.Wins) or 0
 			profile.BestTime = tonumber(data.BestTime)
+			profile.Assistant = tonumber(data.Assistant) or 0
 			if type(data.Keys) == "table" then
 				for id, value in data.Keys do
 					profile.Keys[tostring(id)] = value == true
+				end
+			end
+			if type(data.Magic) == "table" then
+				for id, value in data.Magic do
+					profile.Magic[tostring(id)] = value == true
+				end
+			end
+			if type(data.Upgrades) == "table" then
+				for id, value in data.Upgrades do
+					profile.Upgrades[tostring(id)] = tonumber(value) or 0
 				end
 			end
 		elseif not ok then
@@ -83,6 +97,7 @@ local function updateStats(player: Player)
 	if coins then
 		coins.Value = profile.Coins
 	end
+	player:SetAttribute("Coins", profile.Coins)
 end
 
 function DataService.AddCoins(player: Player, amount: number)
@@ -91,6 +106,17 @@ function DataService.AddCoins(player: Player, amount: number)
 		profile.Coins += amount
 		updateStats(player)
 	end
+end
+
+-- Geeft true terug als de speler genoeg munten had
+function DataService.SpendCoins(player: Player, amount: number): boolean
+	local profile = profiles[player]
+	if not profile or profile.Coins < amount then
+		return false
+	end
+	profile.Coins -= amount
+	updateStats(player)
+	return true
 end
 
 function DataService.SetRoundBooks(player: Player, value: number)

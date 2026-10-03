@@ -15,23 +15,35 @@ local KeyService = require(script.KeyService)
 local HideService = require(script.HideService)
 local DataService = require(script.DataService)
 local RoundService = require(script.RoundService)
+local ShopService = require(script.ShopService)
 
--- Nachtmerrie-sfeer: middernacht, bijna geen licht en dichte mist
-Lighting.ClockTime = 0
-Lighting.Brightness = 0
-Lighting.Ambient = Color3.fromRGB(34, 30, 44)
-Lighting.OutdoorAmbient = Color3.fromRGB(10, 10, 16)
-Lighting.EnvironmentDiffuseScale = 0
-Lighting.EnvironmentSpecularScale = 0
+-- Warme, lichte bibliotheek zoals in het origineel
+Lighting.ClockTime = 14.5
+Lighting.Brightness = 2.2
+Lighting.Ambient = Color3.fromRGB(150, 124, 118)
+Lighting.OutdoorAmbient = Color3.fromRGB(150, 140, 160)
+Lighting.EnvironmentDiffuseScale = 0.6
+Lighting.EnvironmentSpecularScale = 0.4
 Lighting.GlobalShadows = true
-Lighting.FogColor = Color3.fromRGB(6, 5, 10)
-Lighting.FogStart = 10
-Lighting.FogEnd = 110
+Lighting.ShadowSoftness = 0.4
+Lighting.FogEnd = 100000
 local colorCorrection = Instance.new("ColorCorrectionEffect")
-colorCorrection.Saturation = -0.35
-colorCorrection.Contrast = 0.15
-colorCorrection.TintColor = Color3.fromRGB(220, 215, 255)
+colorCorrection.Saturation = 0.12
+colorCorrection.Contrast = 0.05
+colorCorrection.Brightness = 0.02
+colorCorrection.TintColor = Color3.fromRGB(255, 244, 236)
 colorCorrection.Parent = Lighting
+local bloom = Instance.new("BloomEffect")
+bloom.Intensity = 0.6
+bloom.Size = 30
+bloom.Threshold = 1.6
+bloom.Parent = Lighting
+local atmosphere = Instance.new("Atmosphere")
+atmosphere.Density = 0.12
+atmosphere.Haze = 0.5
+atmosphere.Color = Color3.fromRGB(255, 225, 235)
+atmosphere.Decay = Color3.fromRGB(180, 120, 200)
+atmosphere.Parent = Lighting
 
 Players.RespawnTime = Config.RespawnTime
 StarterPlayer.CharacterWalkSpeed = Config.WalkSpeed
@@ -57,7 +69,6 @@ end
 -- Wie de verdieping af valt of vastzit, komt terug bij de balie
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function(character)
-		player:SetAttribute("Flashlight", false)
 		local root = character:WaitForChild("HumanoidRootPart") :: BasePart
 		task.spawn(function()
 			while character.Parent do
@@ -70,35 +81,7 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 end)
 
--- Flashlight-attribuut voor het monster (de lamp zelf staat op de client en wordt hier gesynchroniseerd)
-local Remotes = require(ReplicatedStorage.Shared.Remotes)
-Remotes.Action.OnServerEvent:Connect(function(player, action, value)
-	if action == "Flashlight" then
-		local on = value == true
-		player:SetAttribute("Flashlight", on)
-		local character = player.Character
-		local head = character and character:FindFirstChild("Head")
-		if head then
-			local light = head:FindFirstChild("Flashlight") :: SpotLight?
-			if not light then
-				local newLight = Instance.new("SpotLight")
-				newLight.Name = "Flashlight"
-				newLight.Range = 45
-				newLight.Angle = 50
-				newLight.Brightness = 3
-				newLight.Shadows = true
-				newLight.Color = Color3.fromRGB(255, 245, 220)
-				newLight.Face = Enum.NormalId.Front
-				newLight.Parent = head
-				light = newLight
-			end
-			if light then
-				light.Enabled = on
-			end
-		end
-	end
-end)
-
+ShopService.Init()
 RoundService.Init()
 
 print(Config.GameName .. " is gestart!")

@@ -1,5 +1,6 @@
--- Bouwt de hele (donkere) bibliotheek met code: vloeren, trap, kasten,
--- bordjes, lampen, tafels, kluisjes om je te verstoppen en plekken voor sleutels.
+-- Bouwt de hele bibliotheek met code, in de stijl van het origineel:
+-- roze/crème muren met bogen en houten pilaren, een glazen dakraam,
+-- houten kasten met groene naambordjes, wandlampen, planten en tafels.
 
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,9 +23,7 @@ export type SectionData = {
 	Target: BasePart, -- onzichtbaar onderdeel voor de kastgids
 	Slots: { BasePart },
 	Prompts: { ProximityPrompt },
-	Counter: TextLabel,
-	CounterBack: TextLabel,
-	Sign: BasePart,
+	Counters: { TextLabel },
 }
 
 export type LockerData = {
@@ -43,12 +42,21 @@ export type Library = {
 	KeySpots: { [string]: Vector3 },
 	MonsterSpawn: Vector3,
 	RandomBookSpot: (self: Library) -> CFrame,
+	BookSpotNear: (self: Library, center: Vector3, radius: number, extra: Instance?) -> CFrame?,
 }
 
-local WOOD = Color3.fromRGB(74, 50, 34)
-local DARK_WOOD = Color3.fromRGB(45, 30, 22)
-local WALL = Color3.fromRGB(58, 52, 66)
-local CARPET = Color3.fromRGB(70, 22, 30)
+-- Kleuren uit het origineel
+local WALL = Color3.fromRGB(242, 222, 210)
+local WALL_PANEL = Color3.fromRGB(232, 200, 192)
+local PILLAR = Color3.fromRGB(214, 128, 66)
+local MOULDING = Color3.fromRGB(170, 64, 42)
+local FLOOR = Color3.fromRGB(178, 76, 40)
+local CASE_WOOD = Color3.fromRGB(226, 156, 92)
+local CASE_BACK = Color3.fromRGB(206, 132, 72)
+local DARK_WOOD = Color3.fromRGB(120, 62, 34)
+local GOLD = Color3.fromRGB(230, 186, 96)
+local PLAQUE = Color3.fromRGB(52, 112, 94)
+local LAMP_LIGHT = Color3.fromRGB(255, 214, 160)
 
 local function part(props: { [string]: any }): Part
 	local p = Instance.new("Part")
@@ -56,8 +64,12 @@ local function part(props: { [string]: any }): Part
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Material = Enum.Material.SmoothPlastic
+	-- Shape eerst, anders kan Size verkeerd uitvallen
+	if props.Shape then
+		p.Shape = props.Shape
+	end
 	for key, value in props do
-		if key ~= "Parent" then
+		if key ~= "Parent" and key ~= "Shape" then
 			(p :: any)[key] = value
 		end
 	end
@@ -65,50 +77,94 @@ local function part(props: { [string]: any }): Part
 	return p
 end
 
+-- Decoratie: botst niet en wordt niet geraakt door raycasts
+local function deco(props: { [string]: any }): Part
+	props.CanCollide = false
+	props.CanQuery = false
+	props.CanTouch = false
+	return part(props)
+end
+
 -- Onderdelen waarop boeken mogen verschijnen krijgen dit attribuut
 local function bookSurface(p: BasePart)
 	p:SetAttribute("BookSurface", true)
 end
 
-local function makeSurfaceText(p: BasePart, face: Enum.NormalId, text: string, color: Color3, font: Enum.Font?)
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = face
-	gui.LightInfluence = 0
-	gui.Brightness = 1.4
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 40
-	gui.Parent = p
-
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Text = text
-	label.TextColor3 = color
-	label.TextScaled = true
-	label.Font = font or Enum.Font.Fantasy
-	label.Parent = gui
-	return label
+local function noBooks(p: BasePart)
+	p:SetAttribute("NoBooks", true)
 end
 
-local function buildStructure(parent: Model)
-	local folder = Instance.new("Folder")
-	folder.Name = "Structure"
-	folder.Parent = parent
+local function surfaceGui(p: BasePart, face: Enum.NormalId, pixelsPerStud: number?): SurfaceGui
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = face
+	gui.LightInfluence = 0.4
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = pixelsPerStud or 50
+	gui.Parent = p
+	return gui
+end
 
+-- Groen naambordje zoals in het origineel. Geeft het label voor de teller terug.
+local function plaque(p: BasePart, face: Enum.NormalId, code: string, withCounter: boolean): TextLabel?
+	local gui = surfaceGui(p, face, 60)
+	local frame = Instance.new("Frame")
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.Size = UDim2.fromScale(0.94, 0.88)
+	frame.BackgroundColor3 = PLAQUE
+	frame.Parent = gui
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0.5, 0)
+	c.Parent = frame
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = GOLD
+	stroke.Thickness = 5
+	stroke.Parent = frame
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, if withCounter then 0.62 else 0.9)
+	label.Position = UDim2.fromScale(0, if withCounter then 0.06 else 0.05)
+	label.Font = Enum.Font.Garamond
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(245, 235, 210)
+	label.Text = code
+	label.Parent = frame
+
+	if not withCounter then
+		return nil
+	end
+	local counter = Instance.new("TextLabel")
+	counter.BackgroundTransparency = 1
+	counter.Size = UDim2.fromScale(0.8, 0.26)
+	counter.Position = UDim2.fromScale(0.1, 0.66)
+	counter.Font = Enum.Font.Garamond
+	counter.TextScaled = true
+	counter.TextColor3 = Color3.fromRGB(230, 220, 190)
+	counter.Text = ""
+	counter.Parent = frame
+	return counter
+end
+
+----------------------------------------------------------------------------
+-- Gebouw
+----------------------------------------------------------------------------
+
+local function buildFloors(folder: Folder)
 	local hx, hz = Map.HalfX, Map.HalfZ
 
-	-- Begane grond (tapijt)
 	local floor1 = part({
 		Name = "Floor1",
 		Size = Vector3.new(hx * 2, 2, hz * 2),
 		Position = Vector3.new(0, -1, 0),
-		Color = CARPET,
-		Material = Enum.Material.Fabric,
+		Color = FLOOR,
+		Material = Enum.Material.WoodPlanks,
 		Parent = folder,
 	})
 	bookSurface(floor1)
 
-	-- Eerste verdieping met een gat voor de oprit (x 100..112, z 24..72)
+	-- Eerste verdieping met een gat voor de oprit (x 100..112, z 24..72):
+	-- bovenkant hout, onderkant gestuukt plafond
 	local holeX0, holeX1, holeZ0, holeZ1 = 100, 112, 24, 72
 	local pieces = {
 		{ x0 = -hx, x1 = holeX0, z0 = -hz, z1 = hz },
@@ -117,42 +173,23 @@ local function buildStructure(parent: Model)
 		{ x0 = holeX0, x1 = holeX1, z0 = holeZ1, z1 = hz },
 	}
 	for i, r in pieces do
-		local slab = part({
+		local size = Vector3.new(r.x1 - r.x0, 1, r.z1 - r.z0)
+		local center = Vector3.new((r.x0 + r.x1) / 2, 0, (r.z0 + r.z1) / 2)
+		local top = part({
 			Name = "Floor2_" .. i,
-			Size = Vector3.new(r.x1 - r.x0, 2, r.z1 - r.z0),
-			Position = Vector3.new((r.x0 + r.x1) / 2, F2 - 1, (r.z0 + r.z1) / 2),
-			Color = WOOD,
+			Size = size,
+			Position = center + Vector3.new(0, F2 - 0.5, 0),
+			Color = FLOOR,
 			Material = Enum.Material.WoodPlanks,
 			Parent = folder,
 		})
-		bookSurface(slab)
-	end
-
-	-- Plafond
-	part({
-		Name = "Roof",
-		Size = Vector3.new(hx * 2 + 4, 2, hz * 2 + 4),
-		Position = Vector3.new(0, Map.WallHeight + 1, 0),
-		Color = DARK_WOOD,
-		Material = Enum.Material.Wood,
-		Parent = folder,
-	})
-
-	-- Muren
-	local h = Map.WallHeight + 2
-	local walls = {
-		{ Vector3.new(hx * 2 + 4, h, 2), Vector3.new(0, h / 2 - 2, hz + 1) },
-		{ Vector3.new(hx * 2 + 4, h, 2), Vector3.new(0, h / 2 - 2, -hz - 1) },
-		{ Vector3.new(2, h, hz * 2 + 4), Vector3.new(hx + 1, h / 2 - 2, 0) },
-		{ Vector3.new(2, h, hz * 2 + 4), Vector3.new(-hx - 1, h / 2 - 2, 0) },
-	}
-	for i, w in walls do
+		bookSurface(top)
 		part({
-			Name = "Wall" .. i,
-			Size = w[1],
-			Position = w[2],
+			Name = "Ceiling1_" .. i,
+			Size = size,
+			Position = center + Vector3.new(0, F2 - 1.5, 0),
 			Color = WALL,
-			Material = Enum.Material.Brick,
+			Material = Enum.Material.Plaster,
 			Parent = folder,
 		})
 	end
@@ -162,80 +199,348 @@ local function buildStructure(parent: Model)
 	local top = Vector3.new(106, F2, holeZ0)
 	local mid = (bottom + top) / 2
 	local length = (top - bottom).Magnitude
-	local ramp = part({
+	local rampCFrame = CFrame.lookAt(mid, top)
+	noBooks(part({
 		Name = "Ramp",
 		Size = Vector3.new(holeX1 - holeX0, 1, length + 1),
-		CFrame = CFrame.lookAt(mid, top) * CFrame.new(0, -0.5, 0),
+		CFrame = rampCFrame * CFrame.new(0, -0.5, 0),
 		Color = DARK_WOOD,
 		Material = Enum.Material.WoodPlanks,
 		Parent = folder,
+	}))
+	-- Loper op de oprit
+	deco({
+		Name = "RampRunner",
+		Size = Vector3.new(6, 0.1, length),
+		CFrame = rampCFrame * CFrame.new(0, 0.03, 0),
+		Color = MOULDING,
+		Material = Enum.Material.Fabric,
+		Parent = folder,
 	})
-	ramp:SetAttribute("NoBooks", true)
 
 	-- Leuningen rond het gat op de eerste verdieping
-	local railColor = Color3.fromRGB(110, 80, 45)
 	local rails = {
 		{ Vector3.new(0.6, 3.5, holeZ1 - holeZ0), Vector3.new(holeX0 - 0.3, F2 + 1.75, (holeZ0 + holeZ1) / 2) },
 		{ Vector3.new(0.6, 3.5, holeZ1 - holeZ0), Vector3.new(holeX1 + 0.3, F2 + 1.75, (holeZ0 + holeZ1) / 2) },
 		{ Vector3.new(holeX1 - holeX0, 3.5, 0.6), Vector3.new((holeX0 + holeX1) / 2, F2 + 1.75, holeZ1 + 0.3) },
 	}
 	for i, r in rails do
-		part({ Name = "Rail" .. i, Size = r[1], Position = r[2], Color = railColor, Material = Enum.Material.Wood, Parent = folder })
+		noBooks(part({ Name = "Rail" .. i, Size = r[1], Position = r[2], Color = PILLAR, Material = Enum.Material.Wood, Parent = folder }))
+	end
+	-- Leuningen langs de oprit zelf
+	for _, x in { holeX0 + 0.3, holeX1 - 0.3 } do
+		noBooks(part({
+			Name = "RampRail",
+			Size = Vector3.new(0.4, 3, length),
+			CFrame = CFrame.lookAt(Vector3.new(x, mid.Y, mid.Z), Vector3.new(x, top.Y, top.Z)) * CFrame.new(0, 1.5, 0),
+			Color = PILLAR,
+			Material = Enum.Material.Wood,
+			Parent = folder,
+		}))
+	end
+end
+
+-- Een muur met pilaren, boogpanelen, lijsten en wandlampen
+local function buildWall(folder: Folder, origin: Vector3, along: Vector3, inward: Vector3, length: number, pillarStep: number, skipBay: ((Vector3, number) -> boolean)?)
+	local thickness = 2
+	local h = Map.WallHeight + 2
+	local wallCenter = origin - inward * (thickness / 2) + Vector3.new(0, h / 2 - 2, 0)
+	local rot = CFrame.lookAt(Vector3.zero, inward) -- -Z wijst de kamer in
+	part({
+		Name = "Wall",
+		Size = Vector3.new(length + 4, h, thickness),
+		CFrame = CFrame.new(wallCenter) * rot,
+		Color = WALL,
+		Material = Enum.Material.Plaster,
+		Parent = folder,
+	})
+
+	local function at(t: number, y: number, depth: number): CFrame
+		return CFrame.new(origin + along * t + inward * depth + Vector3.new(0, y, 0)) * rot
 	end
 
-	-- Balie bij de ingang
+	-- Lijsten: plint onderaan en een rode lijst onder elk plafond
+	for _, y0 in { 0, F2 } do
+		deco({ Name = "Baseboard", Size = Vector3.new(length, 1, 0.4), CFrame = at(0, y0 + 0.5, 0.2), Color = DARK_WOOD, Parent = folder })
+		local top = if y0 == 0 then F2 - 2 else Map.WallHeight
+		deco({ Name = "Moulding", Size = Vector3.new(length, 1.4, 1), CFrame = at(0, top - 0.7, 0.5), Color = MOULDING, Material = Enum.Material.Wood, Parent = folder })
+		deco({ Name = "MouldingTrim", Size = Vector3.new(length, 0.3, 1.3), CFrame = at(0, top - 1.55, 0.65), Color = PILLAR, Material = Enum.Material.Wood, Parent = folder })
+	end
+
+	local count = math.floor(length / pillarStep)
+	local first = -(count - 1) * pillarStep / 2
+	for i = 0, count - 1 do
+		local t = first + i * pillarStep
+		deco({
+			Name = "Pillar",
+			Size = Vector3.new(2.6, Map.WallHeight, 1.2),
+			CFrame = at(t, Map.WallHeight / 2, 0.6),
+			Color = PILLAR,
+			Material = Enum.Material.Wood,
+			Parent = folder,
+		})
+		-- Wandlamp op de pilaar (beide verdiepingen)
+		for _, y0 in { 0, F2 } do
+			deco({ Name = "SconceBase", Size = Vector3.new(0.7, 1.4, 0.5), CFrame = at(t, y0 + 9, 1.45), Color = GOLD, Material = Enum.Material.Metal, Parent = folder })
+			local bulb = deco({
+				Name = "SconceBulb",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(1, 1, 1),
+				CFrame = at(t, y0 + 10.1, 1.9),
+				Color = Color3.fromRGB(255, 236, 190),
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+			if i % 2 == 0 then
+				local light = Instance.new("PointLight")
+				light.Color = LAMP_LIGHT
+				light.Range = 18
+				light.Brightness = 1.4
+				light.Parent = bulb
+			end
+		end
+		-- Boogpaneel tussen deze en de volgende pilaar
+		if i < count - 1 then
+			local bt = t + pillarStep / 2
+			for _, y0 in { 0, F2 } do
+				local bayCenter = origin + along * bt + Vector3.new(0, y0, 0)
+				if not (skipBay and skipBay(bayCenter, y0)) then
+					local width = math.min(12, pillarStep - 6)
+					deco({
+						Name = "ArchPanel",
+						Size = Vector3.new(width, 9, 0.2),
+						CFrame = at(bt, y0 + 7.5, 0.1),
+						Color = WALL_PANEL,
+						Material = Enum.Material.Plaster,
+						Parent = folder,
+					})
+					deco({
+						Name = "ArchTop",
+						Shape = Enum.PartType.Cylinder,
+						Size = Vector3.new(0.1, width, width),
+						CFrame = at(bt, y0 + 12, 0.1) * CFrame.Angles(0, math.rad(90), 0),
+						Color = WALL_PANEL,
+						Material = Enum.Material.Plaster,
+						Parent = folder,
+					})
+					-- Rand rond de boog
+					deco({
+						Name = "ArchRim",
+						Shape = Enum.PartType.Cylinder,
+						Size = Vector3.new(0.08, width + 1, width + 1),
+						CFrame = at(bt, y0 + 12, 0.04) * CFrame.Angles(0, math.rad(90), 0),
+						Color = PILLAR,
+						Material = Enum.Material.Wood,
+						Parent = folder,
+					})
+				end
+			end
+		end
+	end
+end
+
+local function buildRoof(folder: Folder)
+	local hx, hz = Map.HalfX + 2, Map.HalfZ + 2
+	local y = Map.WallHeight + 1
+	-- Dakraam in het midden: x -70..70, z -30..30
+	local sx0, sx1, sz0, sz1 = -70, 70, -30, 30
+	local pieces = {
+		{ -hx, hx, -hz, sz0 },
+		{ -hx, hx, sz1, hz },
+		{ -hx, sx0, sz0, sz1 },
+		{ sx1, hx, sz0, sz1 },
+	}
+	for i, r in pieces do
+		part({
+			Name = "Roof" .. i,
+			Size = Vector3.new(r[2] - r[1], 2, r[4] - r[3]),
+			Position = Vector3.new((r[1] + r[2]) / 2, y, (r[3] + r[4]) / 2),
+			Color = WALL,
+			Material = Enum.Material.Plaster,
+			Parent = folder,
+		})
+	end
 	part({
+		Name = "Skylight",
+		Size = Vector3.new(sx1 - sx0, 0.4, sz1 - sz0),
+		Position = Vector3.new(0, y - 0.2, 0),
+		Color = Color3.fromRGB(200, 225, 255),
+		Material = Enum.Material.Glass,
+		Transparency = 0.6,
+		CastShadow = false,
+		Parent = folder,
+	})
+	-- Houten balken over het dakraam
+	for x = sx0, sx1, 20 do
+		deco({ Name = "Beam", Size = Vector3.new(1.4, 1.6, sz1 - sz0 + 2), Position = Vector3.new(x, y - 0.6, 0), Color = MOULDING, Material = Enum.Material.Wood, Parent = folder })
+	end
+	for _, z in { sz0, sz1 } do
+		deco({ Name = "Beam", Size = Vector3.new(sx1 - sx0 + 2, 1.6, 1.4), Position = Vector3.new(0, y - 0.6, z), Color = MOULDING, Material = Enum.Material.Wood, Parent = folder })
+	end
+
+	-- Paarse boom boven het dakraam (zoals op de screenshot)
+	local trunk = Color3.fromRGB(70, 45, 40)
+	local function branch(a: Vector3, b: Vector3, thickness: number)
+		deco({
+			Name = "Branch",
+			Size = Vector3.new(thickness, thickness, (b - a).Magnitude),
+			CFrame = CFrame.lookAt((a + b) / 2, b),
+			Color = trunk,
+			Material = Enum.Material.Wood,
+			Parent = folder,
+		})
+	end
+	branch(Vector3.new(-180, -2, -20), Vector3.new(-112, 64, -10), 6)
+	branch(Vector3.new(-112, 64, -10), Vector3.new(-40, 66, -6), 3.5)
+	branch(Vector3.new(-112, 64, -10), Vector3.new(-70, 72, 18), 3)
+	branch(Vector3.new(-60, 64, -8), Vector3.new(-20, 70, -24), 2)
+	local purple = { Color3.fromRGB(150, 92, 205), Color3.fromRGB(122, 74, 182), Color3.fromRGB(176, 116, 222) }
+	local blobs = {
+		{ Vector3.new(-40, 70, -6), 26 },
+		{ Vector3.new(-70, 76, 18), 24 },
+		{ Vector3.new(-16, 74, -24), 20 },
+		{ Vector3.new(-95, 66, -12), 22 },
+		{ Vector3.new(-50, 80, 10), 22 },
+		{ Vector3.new(-5, 66, 4), 16 },
+	}
+	for i, blob in blobs do
+		deco({
+			Name = "Leaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(blob[2], blob[2], blob[2]),
+			Position = blob[1],
+			Color = purple[(i - 1) % #purple + 1],
+			Material = Enum.Material.LeafyGrass,
+			Parent = folder,
+		})
+	end
+end
+
+local function buildStructure(parent: Model)
+	local folder = Instance.new("Folder")
+	folder.Name = "Structure"
+	folder.Parent = parent
+
+	local hx, hz = Map.HalfX, Map.HalfZ
+	buildFloors(folder)
+	buildRoof(folder)
+
+	-- Bij de voordeur (midden van de voormuur, begane grond) geen boogpaneel
+	local function skipDoor(center: Vector3, y0: number): boolean
+		return y0 == 0 and math.abs(center.X) < 10 and center.Z > 0
+	end
+	buildWall(folder, Vector3.new(0, 0, hz), Vector3.new(1, 0, 0), Vector3.new(0, 0, -1), hx * 2, 20, skipDoor)
+	buildWall(folder, Vector3.new(0, 0, -hz), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), hx * 2, 20)
+	buildWall(folder, Vector3.new(hx, 0, 0), Vector3.new(0, 0, -1), Vector3.new(-1, 0, 0), hz * 2, 20)
+	buildWall(folder, Vector3.new(-hx, 0, 0), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), hz * 2, 20)
+
+	-- Balie bij de ingang met een stapeltje boeken
+	noBooks(part({
 		Name = "Desk",
 		Size = Vector3.new(16, 3.5, 3),
 		Position = Vector3.new(0, 1.75, 58),
-		Color = DARK_WOOD,
+		Color = PILLAR,
 		Material = Enum.Material.Wood,
 		Parent = folder,
-	})
+	}))
+	deco({ Name = "DeskTop", Size = Vector3.new(16.6, 0.3, 3.6), Position = Vector3.new(0, 3.6, 58), Color = MOULDING, Material = Enum.Material.Wood, Parent = folder })
+	for i, color in { Color3.fromRGB(40, 80, 150), Color3.fromRGB(150, 40, 50), Color3.fromRGB(60, 130, 70) } do
+		deco({
+			Name = "DeskBook",
+			Size = Vector3.new(1.6, 0.4, 2.1),
+			CFrame = CFrame.new(-5, 3.95 + (i - 1) * 0.4, 58) * CFrame.Angles(0, math.rad(i * 17), 0),
+			Color = color,
+			Parent = folder,
+		})
+	end
 
-	-- Grote voordeur (decoratie)
-	local door = part({
+	-- Voordeur met het naambord erboven
+	deco({
 		Name = "FrontDoor",
 		Size = Vector3.new(14, 18, 0.5),
 		Position = Vector3.new(0, 9, hz - 0.2),
-		Color = Color3.fromRGB(35, 20, 14),
+		Color = MOULDING,
 		Material = Enum.Material.Wood,
 		Parent = folder,
 	})
-	makeSurfaceText(door, Enum.NormalId.Front, "GESLOTEN\nTOT ALLES\nOPGERUIMD IS", Color3.fromRGB(200, 40, 40))
+	deco({
+		Name = "DoorFrame",
+		Size = Vector3.new(16, 19, 0.3),
+		Position = Vector3.new(0, 9.5, hz - 0.05),
+		Color = PILLAR,
+		Material = Enum.Material.Wood,
+		Parent = folder,
+	})
+	local title = deco({
+		Name = "TitleSign",
+		Size = Vector3.new(30, 3, 0.3),
+		Position = Vector3.new(0, 20.2, hz - 0.3),
+		Color = PLAQUE,
+		Parent = folder,
+	})
+	local gui = surfaceGui(title, Enum.NormalId.Front, 30)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.Garamond
+	label.TextScaled = true
+	label.TextColor3 = GOLD
+	label.Text = "📖 Clean The Library"
+	label.Parent = gui
+
+	-- Kleed bij de ingang
+	deco({ Name = "Rug", Size = Vector3.new(26, 0.1, 12), Position = Vector3.new(0, 0.05, 68), Color = MOULDING, Material = Enum.Material.Fabric, Parent = folder })
+	deco({ Name = "RugBorder", Size = Vector3.new(28, 0.08, 14), Position = Vector3.new(0, 0.04, 68), Color = GOLD, Material = Enum.Material.Fabric, Parent = folder })
 end
 
-local function buildBookcase(parent: Model, center: CFrame, color: Color3)
-	local L, H, D = Map.CaseLength, Map.CaseHeight, Map.CaseDepth
-	local function piece(name: string, size: Vector3, offset: Vector3)
+----------------------------------------------------------------------------
+-- Kasten
+----------------------------------------------------------------------------
+
+-- Eén boogkast (10 breed). Voorkant is +Z.
+local function buildCabinet(parent: Model, cf: CFrame)
+	local H, D = Map.CaseHeight, Map.CaseDepth
+	local W = Map.CaseLength / 3
+	local function piece(name: string, size: Vector3, offset: Vector3, color: Color3?)
 		local p = part({
 			Name = name,
 			Size = size,
-			CFrame = center * CFrame.new(offset),
-			Color = WOOD,
+			CFrame = cf * CFrame.new(offset),
+			Color = color or CASE_WOOD,
 			Material = Enum.Material.Wood,
 			Parent = parent,
 		})
-		p:SetAttribute("NoBooks", true)
+		noBooks(p)
 		return p
 	end
-	piece("Back", Vector3.new(L, H, 0.4), Vector3.new(0, H / 2, -D / 2 + 0.2))
-	piece("SideL", Vector3.new(0.5, H, D), Vector3.new(-L / 2 + 0.25, H / 2, 0))
-	piece("SideR", Vector3.new(0.5, H, D), Vector3.new(L / 2 - 0.25, H / 2, 0))
-	for i, y in { 0.15, 2.65, 5.15, 7.65, H - 0.15 } do
-		piece("Shelf" .. i, Vector3.new(L, 0.3, D), Vector3.new(0, y, 0))
+	piece("Back", Vector3.new(W - 0.4, H, 0.4), Vector3.new(0, H / 2, -D / 2 + 0.2), CASE_BACK)
+	piece("SideL", Vector3.new(0.5, H, D), Vector3.new(-W / 2 + 0.25, H / 2, 0))
+	piece("SideR", Vector3.new(0.5, H, D), Vector3.new(W / 2 - 0.25, H / 2, 0))
+	for i, y in { 0.15, 2.9, 5.65, 8.4 } do
+		piece("Shelf" .. i, Vector3.new(W - 0.6, 0.3, D - 0.2), Vector3.new(0, y, 0))
 	end
-	-- Gekleurde rand zodat je de sectie herkent
-	local trim = part({
-		Name = "Trim",
-		Size = Vector3.new(L, 0.4, 0.2),
-		CFrame = center * CFrame.new(0, H - 0.5, D / 2 + 0.1),
-		Color = color,
-		Material = Enum.Material.Neon,
-		Transparency = 0.3,
+	piece("Top", Vector3.new(W + 0.2, 0.6, D + 0.3), Vector3.new(0, H + 0.1, 0), PILLAR)
+	-- Plint
+	piece("Plinth", Vector3.new(W, 0.6, D + 0.2), Vector3.new(0, 0.3, 0.05), PILLAR)
+	-- Boog bovenop, met een lichtere rand eromheen
+	noBooks(part({
+		Name = "Arch",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.5, W - 0.6, W - 0.6),
+		CFrame = cf * CFrame.new(0, H + 0.4, -D / 2 + 0.3) * CFrame.Angles(0, math.rad(90), 0),
+		Color = CASE_BACK,
+		Material = Enum.Material.Wood,
 		Parent = parent,
-	})
-	trim:SetAttribute("NoBooks", true)
+	}))
+	noBooks(part({
+		Name = "ArchRim",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.2, W + 0.2, W + 0.2),
+		CFrame = cf * CFrame.new(0, H + 0.4, -D / 2 + 0.2) * CFrame.Angles(0, math.rad(90), 0),
+		Color = PILLAR,
+		Material = Enum.Material.Wood,
+		Parent = parent,
+	}))
 end
 
 local function buildSection(parent: Folder, section: Config.Section, index: number, slot: number): SectionData
@@ -244,44 +549,43 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 	local floorY = if section.Floor == 1 then 0 else F2
 	local center = CFrame.new(Map.GridX[col], floorY, Map.GridZ[row])
 	local color = Config.SectionColor(index)
+	local W = Map.CaseLength / 3
+	local H, D = Map.CaseHeight, Map.CaseDepth
 
 	local model = Instance.new("Model")
 	model.Name = "Section_" .. section.Code
 	model:SetAttribute("Code", section.Code)
 	model.Parent = parent
 
-	buildBookcase(model, center, color)
-
-	-- Bordje boven de kast (voor- en achterkant)
-	local sign = part({
-		Name = "Sign",
-		Size = Vector3.new(10, 3.6, 0.4),
-		CFrame = center * CFrame.new(0, Map.CaseHeight + 2.2, 0),
-		Color = Color3.fromRGB(25, 20, 18),
-		Parent = model,
-	})
-	sign:SetAttribute("NoBooks", true)
-	local title = string.format("%s  %s", section.Code, section.Name)
-	makeSurfaceText(sign, Enum.NormalId.Front, title, color).Size = UDim2.fromScale(1, 0.65)
-	makeSurfaceText(sign, Enum.NormalId.Back, title, color).Size = UDim2.fromScale(1, 0.65)
-	local counter = makeSurfaceText(sign, Enum.NormalId.Front, "", Color3.new(1, 1, 1), Enum.Font.GothamBold)
-	counter.Size = UDim2.fromScale(1, 0.32)
-	counter.Position = UDim2.fromScale(0, 0.66)
-	counter.Name = "Counter"
-	local counterBack = makeSurfaceText(sign, Enum.NormalId.Back, "", Color3.new(1, 1, 1), Enum.Font.GothamBold)
-	counterBack.Size = UDim2.fromScale(1, 0.32)
-	counterBack.Position = UDim2.fromScale(0, 0.66)
-	counterBack.Name = "Counter"
-	for _, gui in sign:GetChildren() do
-		if gui:IsA("SurfaceGui") then
-			gui.PixelsPerStud = 30
+	local counters = {}
+	for i = -1, 1 do
+		local cf = center * CFrame.new(i * W, 0, 0)
+		buildCabinet(model, cf)
+		-- Naambordjes voor op de boog (voor- en achterkant)
+		for _, side in { 1, -1 } do
+			local holder = part({
+				Name = "Plaque",
+				Size = Vector3.new(4.4, 2.2, 0.1),
+				CFrame = cf * CFrame.new(0, H + 2.7, -D / 2 + 0.3 + side * 0.32),
+				Transparency = 1,
+				CanCollide = false,
+				CanQuery = false,
+				CanTouch = false,
+				Parent = model,
+			})
+			-- Back = +Z (voorkant van de kast), Front = -Z (achterkant)
+			local face = if side == 1 then Enum.NormalId.Back else Enum.NormalId.Front
+			local counter = plaque(holder, face, section.Code, i == 0)
+			if counter then
+				table.insert(counters, counter)
+			end
 		end
 	end
 
-	-- Lege plekken (spookboeken) die opvullen als je boeken terugzet
+	-- Lege plekken die opvullen als je boeken terugzet
 	local slots = {}
 	local n = Config.BooksPerSection
-	local levels = { 0.3, 2.8, 5.3 }
+	local levels = { 0.3, 3.05, 5.8 }
 	local perLevel = math.ceil(n / #levels)
 	local spacing = (Map.CaseLength - 4) / perLevel
 	for i = 1, n do
@@ -290,11 +594,11 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 		local x = -Map.CaseLength / 2 + 2 + spacing * (pos + 0.5)
 		local ghost = part({
 			Name = "Slot" .. i,
-			Size = Vector3.new(0.6, 2, 1.8),
-			CFrame = center * CFrame.new(x, levels[level] + 1.15, 0.2),
-			Color = color,
-			Material = Enum.Material.ForceField,
-			Transparency = 0.6,
+			Size = Vector3.new(0.6, 2.1, 1.8),
+			CFrame = center * CFrame.new(x, levels[level] + 1.1, 0.2),
+			Color = Color3.fromRGB(255, 245, 225),
+			Material = Enum.Material.Glass,
+			Transparency = 0.75,
 			CanCollide = false,
 			CanQuery = false,
 			CanTouch = false,
@@ -306,18 +610,19 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 	-- Onzichtbaar onderdeel voor de "terugzetten"-knoppen
 	local front = part({
 		Name = "PromptZone",
-		Size = Vector3.new(Map.CaseLength, Map.CaseHeight, 1),
-		CFrame = center * CFrame.new(0, Map.CaseHeight / 2, Map.CaseDepth / 2 + 0.6),
+		Size = Vector3.new(Map.CaseLength, H, 1),
+		CFrame = center * CFrame.new(0, H / 2, D / 2 + 0.6),
 		Transparency = 1,
 		CanCollide = false,
 		CanQuery = false,
 		CanTouch = false,
 		Parent = model,
 	})
+	local title = string.format("%s  %s", section.Code, section.Name)
 	local prompts = {}
 	for _, x in { -10, 0, 10 } do
 		local att = Instance.new("Attachment")
-		att.Position = Vector3.new(x, -1.5, 0)
+		att.Position = Vector3.new(x, -2, 0)
 		att.Parent = front
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.ActionText = "Boeken terugzetten"
@@ -340,11 +645,13 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 		Target = front,
 		Slots = slots,
 		Prompts = prompts,
-		Counter = counter,
-		CounterBack = counterBack,
-		Sign = sign,
+		Counters = counters,
 	}
 end
+
+----------------------------------------------------------------------------
+-- Meubels
+----------------------------------------------------------------------------
 
 local function buildTable(parent: Folder, pos: Vector3)
 	local model = Instance.new("Model")
@@ -354,77 +661,127 @@ local function buildTable(parent: Folder, pos: Vector3)
 		Name = "Top",
 		Size = Vector3.new(14, 0.5, 6),
 		Position = pos + Vector3.new(0, 3, 0),
-		Color = WOOD,
+		Color = PILLAR,
 		Material = Enum.Material.Wood,
 		Parent = model,
 	})
 	bookSurface(top)
-	for _, o in { Vector3.new(-6.5, 0, -2.5), Vector3.new(6.5, 0, -2.5), Vector3.new(-6.5, 0, 2.5), Vector3.new(6.5, 0, 2.5) } do
-		part({
+	for _, o in { Vector3.new(-6.3, 0, -2.4), Vector3.new(6.3, 0, -2.4), Vector3.new(-6.3, 0, 2.4), Vector3.new(6.3, 0, 2.4) } do
+		noBooks(part({
 			Name = "Leg",
-			Size = Vector3.new(0.5, 2.75, 0.5),
+			Size = Vector3.new(0.6, 2.75, 0.6),
 			Position = pos + o + Vector3.new(0, 1.375, 0),
 			Color = DARK_WOOD,
+			Material = Enum.Material.Wood,
 			Parent = model,
-		}):SetAttribute("NoBooks", true)
+		}))
 	end
-	-- Een kaarsje op tafel
-	local candle = part({
-		Name = "Candle",
-		Size = Vector3.new(0.4, 1, 0.4),
-		Position = pos + Vector3.new(0, 3.75, 0),
-		Color = Color3.fromRGB(240, 230, 200),
+	-- Groene bureaulamp
+	deco({ Name = "LampBase", Size = Vector3.new(0.9, 0.2, 0.9), Position = pos + Vector3.new(0, 3.35, 0), Color = GOLD, Material = Enum.Material.Metal, Parent = model })
+	deco({ Name = "LampStem", Size = Vector3.new(0.15, 1.2, 0.15), Position = pos + Vector3.new(0, 3.95, 0), Color = GOLD, Material = Enum.Material.Metal, Parent = model })
+	local shade = deco({
+		Name = "LampShade",
+		Size = Vector3.new(1.8, 0.5, 0.8),
+		Position = pos + Vector3.new(0, 4.6, 0),
+		Color = Color3.fromRGB(40, 120, 80),
+		Material = Enum.Material.Glass,
 		Parent = model,
 	})
-	candle:SetAttribute("NoBooks", true)
 	local light = Instance.new("PointLight")
-	light.Color = Color3.fromRGB(255, 160, 70)
+	light.Color = LAMP_LIGHT
 	light.Range = 12
 	light.Brightness = 1
-	light.Parent = candle
-	candle:SetAttribute("Flicker", true)
+	light.Parent = shade
+	-- Stoelen
+	for _, z in { -4.5, 4.5 } do
+		for _, x in { -4, 4 } do
+			noBooks(part({ Name = "ChairSeat", Size = Vector3.new(2.2, 0.4, 2.2), Position = pos + Vector3.new(x, 1.8, z), Color = MOULDING, Material = Enum.Material.Fabric, Parent = model }))
+			deco({ Name = "ChairBack", Size = Vector3.new(2.2, 2.4, 0.3), Position = pos + Vector3.new(x, 3.2, z + math.sign(z) * 1), Color = DARK_WOOD, Material = Enum.Material.Wood, Parent = model })
+		end
+	end
 end
 
+local function buildPlant(parent: Folder, pos: Vector3)
+	local model = Instance.new("Model")
+	model.Name = "Plant"
+	model.Parent = parent
+	noBooks(part({
+		Name = "Vase",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(3.2, 2, 2),
+		CFrame = CFrame.new(pos + Vector3.new(0, 1.6, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(160, 178, 112),
+		Material = Enum.Material.Marble,
+		Parent = model,
+	}))
+	deco({
+		Name = "VaseRim",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.4, 2.4, 2.4),
+		CFrame = CFrame.new(pos + Vector3.new(0, 3.2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(140, 160, 96),
+		Material = Enum.Material.Marble,
+		Parent = model,
+	})
+	for i = 1, 9 do
+		local yaw = math.rad(i * 40 + math.random(-10, 10))
+		local tilt = math.rad(math.random(15, 40))
+		local len = math.random(30, 50) / 10
+		deco({
+			Name = "Leaf",
+			Size = Vector3.new(0.7, len, 0.12),
+			CFrame = CFrame.new(pos + Vector3.new(0, 3.2, 0))
+				* CFrame.Angles(0, yaw, 0)
+				* CFrame.Angles(tilt, 0, 0)
+				* CFrame.new(0, len / 2, 0),
+			Color = if i % 2 == 0 then Color3.fromRGB(70, 150, 70) else Color3.fromRGB(110, 175, 80),
+			Material = Enum.Material.SmoothPlastic,
+			Parent = model,
+		})
+	end
+end
+
+-- Houten kast om je in te verstoppen
 local function buildLocker(parent: Folder, pos: Vector3, facing: Vector3): LockerData
 	local model = Instance.new("Model")
-	model.Name = "Locker"
+	model.Name = "Wardrobe"
 	model.Parent = parent
 	local base = CFrame.lookAt(pos, pos + facing)
-	local metal = Color3.fromRGB(60, 66, 70)
-	local function piece(name: string, size: Vector3, offset: Vector3)
+	local function piece(name: string, size: Vector3, offset: Vector3, color: Color3?)
 		local p = part({
 			Name = name,
 			Size = size,
 			CFrame = base * CFrame.new(offset),
-			Color = metal,
-			Material = Enum.Material.DiamondPlate,
+			Color = color or CASE_WOOD,
+			Material = Enum.Material.Wood,
 			Parent = model,
 		})
-		p:SetAttribute("NoBooks", true)
+		noBooks(p)
 		return p
 	end
 	-- Voorkant = -Z (CFrame.lookAt kijkt langs -Z)
-	piece("Back", Vector3.new(4.4, 8, 0.4), Vector3.new(0, 4, 2))
-	piece("Left", Vector3.new(0.4, 8, 4.4), Vector3.new(-2, 4, 0))
-	piece("Right", Vector3.new(0.4, 8, 4.4), Vector3.new(2, 4, 0))
-	piece("Roof", Vector3.new(4.4, 0.4, 4.4), Vector3.new(0, 8.2, 0))
-	local door = piece("Door", Vector3.new(3.6, 7.8, 0.3), Vector3.new(0, 4, -2))
-	door.Color = Color3.fromRGB(80, 88, 92)
-	-- Kijkgleufjes
-	for i = 1, 3 do
-		part({
-			Name = "Slit",
-			Size = Vector3.new(2.4, 0.15, 0.05),
-			CFrame = base * CFrame.new(0, 6.6 - i * 0.35, -2.17),
-			Color = Color3.new(0, 0, 0),
-			CanCollide = false,
-			Parent = model,
-		})
+	piece("Back", Vector3.new(4.6, 8.5, 0.4), Vector3.new(0, 4.25, 2))
+	piece("Left", Vector3.new(0.4, 8.5, 4.4), Vector3.new(-2.1, 4.25, 0))
+	piece("Right", Vector3.new(0.4, 8.5, 4.4), Vector3.new(2.1, 4.25, 0))
+	piece("Roof", Vector3.new(5, 0.6, 4.8), Vector3.new(0, 8.6, 0), PILLAR)
+	local door = piece("Door", Vector3.new(3.8, 8, 0.3), Vector3.new(0, 4.2, -2), CASE_BACK)
+	-- Deurpaneeltjes en knop
+	for _, y in { 2.3, 6 } do
+		deco({ Name = "DoorPanel", Size = Vector3.new(2.8, 2.8, 0.08), CFrame = base * CFrame.new(0, y, -2.18), Color = CASE_WOOD, Material = Enum.Material.Wood, Parent = model })
 	end
+	deco({
+		Name = "Knob",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.35, 0.35, 0.35),
+		CFrame = base * CFrame.new(1.4, 4.2, -2.25),
+		Color = GOLD,
+		Material = Enum.Material.Metal,
+		Parent = model,
+	})
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Verstoppen"
-	prompt.ObjectText = "Kluisje"
+	prompt.ObjectText = "Kast"
 	prompt.HoldDuration = 0.3
 	prompt.MaxActivationDistance = 7
 	prompt.RequiresLineOfSight = false
@@ -439,42 +796,26 @@ local function buildLocker(parent: Folder, pos: Vector3, facing: Vector3): Locke
 end
 
 local function buildLamps(parent: Folder)
-	local index = 0
-	for _, y in { F2 - 3, Map.WallHeight - 3 } do
-		for x = -100, 100, 50 do
-			for z = -60, 60, 40 do
-				index += 1
-				local lamp = part({
-					Name = "Lamp",
-					Shape = Enum.PartType.Ball,
-					Size = Vector3.new(1.6, 1.6, 1.6),
-					Position = Vector3.new(x, y, z),
-					Color = Color3.fromRGB(255, 200, 130),
-					Material = Enum.Material.Neon,
-					CanCollide = false,
-					CanQuery = false,
-					Parent = parent,
-				})
-				part({
-					Name = "Chain",
-					Size = Vector3.new(0.15, 2, 0.15),
-					Position = Vector3.new(x, y + 1.8, z),
-					Color = Color3.fromRGB(40, 40, 40),
-					CanCollide = false,
-					CanQuery = false,
-					Parent = parent,
-				})
-				local light = Instance.new("PointLight")
-				light.Color = Color3.fromRGB(255, 190, 120)
-				light.Range = 26
-				light.Brightness = 0.9
-				light.Shadows = true
-				light.Parent = lamp
-				-- Ongeveer een op de drie lampen flikkert (dat doet de client)
-				if index % 3 == 0 then
-					lamp:SetAttribute("Flicker", true)
-				end
-			end
+	-- Hangende kroonluchters op de begane grond
+	for x = -100, 100, 50 do
+		for z = -60, 60, 40 do
+			local y = F2 - 4.5
+			deco({ Name = "Chain", Size = Vector3.new(0.15, 2.5, 0.15), Position = Vector3.new(x, y + 1.9, z), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
+			deco({ Name = "Crown", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 3, 3), CFrame = CFrame.new(x, y + 0.6, z) * CFrame.Angles(0, 0, math.rad(90)), Color = GOLD, Material = Enum.Material.Metal, Parent = parent })
+			local lamp = deco({
+				Name = "Lamp",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(1.8, 1.8, 1.8),
+				Position = Vector3.new(x, y, z),
+				Color = Color3.fromRGB(255, 236, 190),
+				Material = Enum.Material.Neon,
+				Parent = parent,
+			})
+			local light = Instance.new("PointLight")
+			light.Color = LAMP_LIGHT
+			light.Range = 30
+			light.Brightness = 1.2
+			light.Parent = lamp
 		end
 	end
 end
@@ -506,23 +847,44 @@ function LibraryBuilder.Build(): Library
 	end
 
 	-- Leestafels op de overgebleven plekken in het rooster
-	local tables = Instance.new("Folder")
-	tables.Name = "Tables"
-	tables.Parent = model
+	local furniture = Instance.new("Folder")
+	furniture.Name = "Furniture"
+	furniture.Parent = model
 	local slotCount = #Map.GridX * #Map.GridZ
 	for floor = 1, 2 do
 		for slot = usedSlots[floor] + 1, slotCount do
 			local col = (slot - 1) % #Map.GridX + 1
 			local row = math.floor((slot - 1) / #Map.GridX) + 1
 			local y = if floor == 1 then 0 else F2
-			buildTable(tables, Vector3.new(Map.GridX[col], y, Map.GridZ[row]))
+			buildTable(furniture, Vector3.new(Map.GridX[col], y, Map.GridZ[row]))
 		end
 	end
 	-- Extra tafels in de hal bij de ingang
-	buildTable(tables, Vector3.new(-60, 0, 62))
-	buildTable(tables, Vector3.new(60, 0, 62))
-	buildTable(tables, Vector3.new(-60, F2, 62))
-	buildTable(tables, Vector3.new(40, F2, 62))
+	buildTable(furniture, Vector3.new(-60, 0, 62))
+	buildTable(furniture, Vector3.new(60, 0, 62))
+	buildTable(furniture, Vector3.new(-60, F2, 62))
+	buildTable(furniture, Vector3.new(40, F2, 62))
+
+	-- Planten
+	local plantSpots = {
+		Vector3.new(-115, 0, 75),
+		Vector3.new(115, 0, 75),
+		Vector3.new(115, 0, -75),
+		Vector3.new(-30, 0, 76),
+		Vector3.new(30, 0, 76),
+		Vector3.new(-11, 0, 58),
+		Vector3.new(11, 0, 58),
+		Vector3.new(-115, F2, 75),
+		Vector3.new(115, F2, 75),
+		Vector3.new(115, F2, -75),
+		Vector3.new(0, F2, 76),
+		Vector3.new(-60, F2, -77),
+		Vector3.new(-115, F2, 0),
+		Vector3.new(60, 0, -77),
+	}
+	for _, spot in plantSpots do
+		buildPlant(furniture, spot)
+	end
 
 	local lamps = Instance.new("Folder")
 	lamps.Name = "Lamps"
@@ -540,25 +902,23 @@ function LibraryBuilder.Build(): Library
 		{ Vector3.new(117, 0, -20), Vector3.new(-1, 0, 0) },
 		{ Vector3.new(-117, F2, 40), Vector3.new(1, 0, 0) },
 		{ Vector3.new(-20, F2, -77), Vector3.new(0, 0, 1) },
-		{ Vector3.new(117, F2, -50), Vector3.new(-1, 0, 0) },
+		{ Vector3.new(117, F2, -60), Vector3.new(-1, 0, 0) },
 		{ Vector3.new(80, F2, 77), Vector3.new(0, 0, -1) },
 	}
 	for _, spot in lockerSpots do
 		table.insert(lockers, buildLocker(lockersFolder, spot[1], spot[2]))
 	end
 
-	-- Spawnplek achter de balie
+	-- Spawnplek achter de balie (onzichtbaar, op het kleed)
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "Spawn"
 	spawn.Anchored = true
 	spawn.Neutral = true
 	spawn.Duration = 0
 	spawn.Size = Vector3.new(10, 1, 6)
-	spawn.Position = Vector3.new(0, 0.5, 68)
-	spawn.Color = Color3.fromRGB(60, 40, 30)
-	spawn.Material = Enum.Material.Wood
-	spawn.TopSurface = Enum.SurfaceType.Smooth
-	spawn:SetAttribute("NoBooks", true)
+	spawn.Position = Vector3.new(0, -0.45, 68)
+	spawn.Transparency = 1
+	spawn.CanQuery = false
 	spawn.Parent = model
 
 	-- Patrouillepunten voor het monster (in de gangpaden, beide verdiepingen)
@@ -580,7 +940,7 @@ function LibraryBuilder.Build(): Library
 
 	local library = {
 		Model = model,
-		SpawnCFrame = spawn.CFrame + Vector3.new(0, 3, 0),
+		SpawnCFrame = CFrame.new(0, 3.5, 68),
 		Sections = sections,
 		Lockers = lockers,
 		Waypoints = waypoints,
@@ -597,25 +957,60 @@ function LibraryBuilder.Build(): Library
 	rayParams.FilterType = Enum.RaycastFilterType.Include
 	rayParams.FilterDescendantsInstances = { model }
 
-	-- Zoekt een willekeurige plek op een vloer of tafel voor een boek
+	local function blockedSpot(probe: Vector3): boolean
+		return isInsideRect(probe, 97, 115, 20, 76) -- oprit
+			or isInsideRect(probe, -9, 9, 55, 80) -- balie en spawn
+	end
+
+	local function surfaceAt(x: number, z: number, topY: number, params: RaycastParams): CFrame?
+		if blockedSpot(Vector3.new(x, 0, z)) then
+			return nil
+		end
+		local result = Workspace:Raycast(Vector3.new(x, topY, z), Vector3.new(0, -30, 0), params)
+		if not result then
+			return nil
+		end
+		local hit = result.Instance
+		if hit:GetAttribute("BookSurface") or hit:GetAttribute("IsBook") then
+			local yaw = math.rad(math.random(0, 359))
+			return CFrame.new(result.Position) * CFrame.Angles(0, yaw, 0)
+		end
+		return nil
+	end
+
+	-- Zoekt een willekeurige plek op een vloer of tafel voor een boek.
+	-- Geeft de CFrame van het oppervlak terug (het boek zet zichzelf erop).
 	function library.RandomBookSpot(_self: Library): CFrame
 		for _ = 1, 60 do
 			local floor = math.random(1, 2)
 			local x = math.random(-Map.HalfX + 3, Map.HalfX - 3) + math.random()
 			local z = math.random(-Map.HalfZ + 3, Map.HalfZ - 3) + math.random()
-			local origin = Vector3.new(x, (if floor == 1 then F2 - 3 else Map.WallHeight - 4), z)
-			local probe = Vector3.new(x, 0, z)
-			local blocked = isInsideRect(probe, 97, 115, 20, 76) -- oprit
-				or isInsideRect(probe, -9, 9, 55, 80) -- balie en spawn
-			if not blocked then
-				local result = Workspace:Raycast(origin, Vector3.new(0, -30, 0), rayParams)
-				if result and result.Instance:GetAttribute("BookSurface") then
-					local yaw = math.rad(math.random(0, 359))
-					return CFrame.new(result.Position + Vector3.new(0, 0.18, 0)) * CFrame.Angles(0, yaw, 0)
-				end
+			local topY = if floor == 1 then F2 - 3 else Map.WallHeight - 4
+			local spot = surfaceAt(x, z, topY, rayParams)
+			if spot then
+				return spot
 			end
 		end
-		return CFrame.new(0, 0.2, 50)
+		return CFrame.new(0, 0, 50)
+	end
+
+	-- Plek in de buurt van een punt; met `extra` (bijv. de map met boeken) erbij
+	-- kunnen boeken op elkaar komen te liggen, zodat er stapels ontstaan.
+	function library.BookSpotNear(_self: Library, center: Vector3, radius: number, extra: Instance?): CFrame?
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = if extra then { model, extra } else { model }
+		local floorY = if center.Y >= F2 - 1 then F2 else 0
+		local topY = if floorY == 0 then F2 - 3 else Map.WallHeight - 4
+		for _ = 1, 12 do
+			local angle = math.random() * math.pi * 2
+			local r = math.sqrt(math.random()) * radius
+			local spot = surfaceAt(center.X + math.cos(angle) * r, center.Z + math.sin(angle) * r, topY, params)
+			if spot and spot.Position.Y < floorY + 6 then
+				return spot
+			end
+		end
+		return nil
 	end
 
 	return library
