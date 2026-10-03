@@ -1,0 +1,3 @@
+# Tools voor dit project (installeer met `aftman install`)
+[tools]
+rojo = "rojo-rbx/rojo@7.4.4"
