@@ -1,0 +1,9 @@
+{
+  "name": "library-thumbnail",
+  "private": true,
+  "description": "Maakt het icoon en de thumbnail van The Library Never Sleeps (3D-render met three.js)",
+  "dependencies": {
+    "three": "0.169.0",
+    "playwright": "^1.48.0"
+  }
+}
