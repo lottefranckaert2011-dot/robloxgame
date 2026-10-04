@@ -471,6 +471,8 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 	if not self.Active or not list or #list == 0 then
 		return 0
 	end
+	local root = getRoot(player)
+	local flying = table.clone(list)
 	local codes = {}
 	for _, book in list do
 		codes[book.Code] = true
@@ -480,13 +482,48 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 		total += self:PlaceMatching(player, code, true)
 	end
 	if total > 0 then
-		local root = getRoot(player)
 		if root then
 			playSound(Config.SoundIds.Place, root)
+			-- Laat de boeken zichtbaar van je handen naar hun kast vliegen
+			for i, book in flying do
+				local section = self.Library.Sections[book.Code]
+				if section then
+					task.delay((i - 1) * 0.12, self.FlyVisual, self, book, root.Position + Vector3.new(0, 1, 0), section.Target.Position)
+				end
+			end
 		end
 		self:Changed(player)
 	end
 	return total
+end
+
+-- Alleen voor het zicht: een boek dat met sterretjes naar een kast vliegt
+function BookService.FlyVisual(self: BookService, book: BookData, from: Vector3, to: Vector3)
+	local p = buildBookParts(book, 1)
+	p.CanQuery = false
+	local pages = p:FindFirstChild("Pages") :: BasePart?
+	if pages then
+		pages.CanQuery = false
+	end
+	moveBook(p, CFrame.new(from))
+	p.Anchored = true
+	local sparkles = Instance.new("Sparkles")
+	sparkles.SparkleColor = Color3.fromRGB(255, 230, 140)
+	sparkles.Parent = p
+	p.Parent = self.Library.Model
+	local mid = (from + to) / 2 + Vector3.new(0, 8, 0)
+	local up = TweenService:Create(p, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = CFrame.new(mid) * CFrame.Angles(0, math.rad(180), math.rad(20)),
+	})
+	up:Play()
+	up.Completed:Wait()
+	local duration = math.clamp((to - mid).Magnitude / 45, 0.5, 2)
+	local down = TweenService:Create(p, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {
+		CFrame = CFrame.new(to) * CFrame.Angles(0, math.rad(360), 0),
+	})
+	down:Play()
+	down.Completed:Wait()
+	p:Destroy()
 end
 
 -- De assistent laat een willekeurig boek naar de goede kast vliegen

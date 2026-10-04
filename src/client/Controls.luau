@@ -164,7 +164,13 @@ local function useAbility(id: string)
 		return
 	end
 	local now = os.clock()
-	if now < (cooldownUntil[id] or 0) then
+	local wait = (cooldownUntil[id] or 0) - now
+	if wait > 0 then
+		Hud.Notify(string.format("⏳ %s: nog %d s wachten", info.Name, math.ceil(wait)), Color3.fromRGB(200, 200, 220))
+		return
+	end
+	if not roomModel() then
+		Hud.Notify("Magie werkt alleen in een zaal. Kies eerst een zaal!", Color3.fromRGB(220, 220, 220))
 		return
 	end
 	local used = true
@@ -172,9 +178,18 @@ local function useAbility(id: string)
 		used = insight()
 	elseif id == "ShelfGuide" then
 		used = shelfGuide()
-	else
-		-- Verzamelen en Auto-plaatsen gebeuren op de server
+	elseif id == "AutoShelf" then
+		-- Zonder boeken in je handen heeft het geen zin (en verspil je de afkoeltijd niet)
+		if #Controls.Inventory == 0 then
+			Hud.Notify("✨ Pak eerst boeken op, dan vliegen ze vanzelf naar hun kast.", Color3.fromRGB(255, 230, 140))
+			return
+		end
 		Remotes.Action:FireServer("Ability", id)
+		used = false -- de server zet de afkoeltijd als het gelukt is
+	else
+		-- Verzamelen gebeurt op de server
+		Remotes.Action:FireServer("Ability", id)
+		used = false
 	end
 	if used then
 		cooldownUntil[id] = now + info.Cooldown
@@ -217,6 +232,16 @@ function Controls.Init(hud)
 		end, info.Key, gamepad[i])
 		Hud.AbilitySlots[info.Id].Activated:Connect(function()
 			useAbility(info.Id)
+		end)
+	end
+
+	-- Afkoeltijd van magie die op de server gebeurt (alleen als het echt gelukt is)
+	for _, info in Config.Magic do
+		player:GetAttributeChangedSignal("Cooldown_" .. info.Id):Connect(function()
+			local endsAt = player:GetAttribute("Cooldown_" .. info.Id)
+			if type(endsAt) == "number" then
+				cooldownUntil[info.Id] = os.clock() + (endsAt - Workspace:GetServerTimeNow())
+			end
 		end)
 	end
 

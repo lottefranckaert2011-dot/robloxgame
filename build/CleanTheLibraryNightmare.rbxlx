@@ -991,6 +991,8 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 	if not self.Active or not list or #list == 0 then
 		return 0
 	end
+	local root = getRoot(player)
+	local flying = table.clone(list)
 	local codes = {}
 	for _, book in list do
 		codes[book.Code] = true
@@ -1000,13 +1002,48 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 		total += self:PlaceMatching(player, code, true)
 	end
 	if total > 0 then
-		local root = getRoot(player)
 		if root then
 			playSound(Config.SoundIds.Place, root)
+			-- Laat de boeken zichtbaar van je handen naar hun kast vliegen
+			for i, book in flying do
+				local section = self.Library.Sections[book.Code]
+				if section then
+					task.delay((i - 1) * 0.12, self.FlyVisual, self, book, root.Position + Vector3.new(0, 1, 0), section.Target.Position)
+				end
+			end
 		end
 		self:Changed(player)
 	end
 	return total
+end
+
+-- Alleen voor het zicht: een boek dat met sterretjes naar een kast vliegt
+function BookService.FlyVisual(self: BookService, book: BookData, from: Vector3, to: Vector3)
+	local p = buildBookParts(book, 1)
+	p.CanQuery = false
+	local pages = p:FindFirstChild("Pages") :: BasePart?
+	if pages then
+		pages.CanQuery = false
+	end
+	moveBook(p, CFrame.new(from))
+	p.Anchored = true
+	local sparkles = Instance.new("Sparkles")
+	sparkles.SparkleColor = Color3.fromRGB(255, 230, 140)
+	sparkles.Parent = p
+	p.Parent = self.Library.Model
+	local mid = (from + to) / 2 + Vector3.new(0, 8, 0)
+	local up = TweenService:Create(p, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = CFrame.new(mid) * CFrame.Angles(0, math.rad(180), math.rad(20)),
+	})
+	up:Play()
+	up.Completed:Wait()
+	local duration = math.clamp((to - mid).Magnitude / 45, 0.5, 2)
+	local down = TweenService:Create(p, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {
+		CFrame = CFrame.new(to) * CFrame.Angles(0, math.rad(360), 0),
+	})
+	down:Play()
+	down.Completed:Wait()
+	p:Destroy()
 end
 
 -- De assistent laat een willekeurig boek naar de goede kast vliegen
@@ -4530,6 +4567,7 @@ return RoomService
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -4622,16 +4660,22 @@ local function useAbility(player: Player, id: string)
 	if (mine[id] or 0) > now + 0.5 then
 		return
 	end
+	-- De afkoeltijd telt alleen als de magie echt iets deed
+	local books = RoomService.GetBooks(player)
 	if id == "Assemble" then
-		mine[id] = now + info.Cooldown
-		local books = RoomService.GetBooks(player)
 		local got = if books then books:Assemble(player, Config.AssembleRadius) else 0
+		if got > 0 then
+			mine[id] = now + info.Cooldown
+			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
+		end
 		notify(player, if got > 0 then string.format("🧲 %d boek%s verzameld!", got, if got == 1 then "" else "en") else "🧲 Geen boeken in de buurt (of je handen zijn vol).", Color3.fromRGB(150, 210, 255))
 	elseif id == "AutoShelf" then
-		mine[id] = now + info.Cooldown
-		local books = RoomService.GetBooks(player)
 		local placed = if books then books:AutoShelf(player) else 0
-		notify(player, if placed > 0 then string.format("✨ %d boek%s teruggezet!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
+		if placed > 0 then
+			mine[id] = now + info.Cooldown
+			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
+		end
+		notify(player, if placed > 0 then string.format("✨ %d boek%s vliegen naar hun kast!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
 	end
 end
 
@@ -4873,7 +4917,13 @@ local function useAbility(id: string)
 		return
 	end
 	local now = os.clock()
-	if now < (cooldownUntil[id] or 0) then
+	local wait = (cooldownUntil[id] or 0) - now
+	if wait > 0 then
+		Hud.Notify(string.format("⏳ %s: nog %d s wachten", info.Name, math.ceil(wait)), Color3.fromRGB(200, 200, 220))
+		return
+	end
+	if not roomModel() then
+		Hud.Notify("Magie werkt alleen in een zaal. Kies eerst een zaal!", Color3.fromRGB(220, 220, 220))
 		return
 	end
 	local used = true
@@ -4881,9 +4931,18 @@ local function useAbility(id: string)
 		used = insight()
 	elseif id == "ShelfGuide" then
 		used = shelfGuide()
-	else
-		-- Verzamelen en Auto-plaatsen gebeuren op de server
+	elseif id == "AutoShelf" then
+		-- Zonder boeken in je handen heeft het geen zin (en verspil je de afkoeltijd niet)
+		if #Controls.Inventory == 0 then
+			Hud.Notify("✨ Pak eerst boeken op, dan vliegen ze vanzelf naar hun kast.", Color3.fromRGB(255, 230, 140))
+			return
+		end
 		Remotes.Action:FireServer("Ability", id)
+		used = false -- de server zet de afkoeltijd als het gelukt is
+	else
+		-- Verzamelen gebeurt op de server
+		Remotes.Action:FireServer("Ability", id)
+		used = false
 	end
 	if used then
 		cooldownUntil[id] = now + info.Cooldown
@@ -4926,6 +4985,16 @@ function Controls.Init(hud)
 		end, info.Key, gamepad[i])
 		Hud.AbilitySlots[info.Id].Activated:Connect(function()
 			useAbility(info.Id)
+		end)
+	end
+
+	-- Afkoeltijd van magie die op de server gebeurt (alleen als het echt gelukt is)
+	for _, info in Config.Magic do
+		player:GetAttributeChangedSignal("Cooldown_" .. info.Id):Connect(function()
+			local endsAt = player:GetAttribute("Cooldown_" .. info.Id)
+			if type(endsAt) == "number" then
+				cooldownUntil[info.Id] = os.clock() + (endsAt - Workspace:GetServerTimeNow())
+			end
 		end)
 	end
 

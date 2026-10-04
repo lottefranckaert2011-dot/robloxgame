@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -94,16 +95,22 @@ local function useAbility(player: Player, id: string)
 	if (mine[id] or 0) > now + 0.5 then
 		return
 	end
+	-- De afkoeltijd telt alleen als de magie echt iets deed
+	local books = RoomService.GetBooks(player)
 	if id == "Assemble" then
-		mine[id] = now + info.Cooldown
-		local books = RoomService.GetBooks(player)
 		local got = if books then books:Assemble(player, Config.AssembleRadius) else 0
+		if got > 0 then
+			mine[id] = now + info.Cooldown
+			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
+		end
 		notify(player, if got > 0 then string.format("🧲 %d boek%s verzameld!", got, if got == 1 then "" else "en") else "🧲 Geen boeken in de buurt (of je handen zijn vol).", Color3.fromRGB(150, 210, 255))
 	elseif id == "AutoShelf" then
-		mine[id] = now + info.Cooldown
-		local books = RoomService.GetBooks(player)
 		local placed = if books then books:AutoShelf(player) else 0
-		notify(player, if placed > 0 then string.format("✨ %d boek%s teruggezet!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
+		if placed > 0 then
+			mine[id] = now + info.Cooldown
+			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
+		end
+		notify(player, if placed > 0 then string.format("✨ %d boek%s vliegen naar hun kast!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
 	end
 end
 
