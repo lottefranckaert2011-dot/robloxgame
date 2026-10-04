@@ -17,7 +17,7 @@
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--!strict
--- Gedeelde instellingen voor Clean The Library [Nightmare].
+-- Gedeelde instellingen voor Shush! The Midnight Library.
 -- Pas hier getallen aan om het spel makkelijker of moeilijker te maken.
 
 export type Section = {
@@ -52,7 +52,7 @@ export type KeyInfo = {
 
 local Config = {}
 
-Config.GameName = "Clean The Library 📖 [Nightmare]"
+Config.GameName = "Shush! The Midnight Library"
 
 -- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
 Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start
@@ -1382,6 +1382,7 @@ return BookService
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
+-- Deze naam blijft hetzelfde (ook na het hernoemen van het spel), anders raken spelers hun munten kwijt
 local STORE_NAME = "CleanTheLibraryNightmare_v1"
 
 export type Profile = {
@@ -2363,7 +2364,7 @@ local function buildStructure(parent: Model)
 	label.Font = Enum.Font.Garamond
 	label.TextScaled = true
 	label.TextColor3 = GOLD
-	label.Text = "📖 Clean The Library"
+	label.Text = "📖 Shush! The Midnight Library"
 	label.Parent = gui
 
 	-- Kleed bij de ingang
@@ -3329,7 +3330,7 @@ local function buildBigBook(folder: Folder)
 	title.Font = Enum.Font.Garamond
 	title.TextScaled = true
 	title.TextColor3 = GOLD
-	title.Text = "Clean The\nLibrary"
+	title.Text = "Shush!\nThe Midnight\nLibrary"
 	title.Parent = gui
 end
 

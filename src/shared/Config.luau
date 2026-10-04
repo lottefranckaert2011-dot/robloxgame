@@ -1,5 +1,5 @@
 --!strict
--- Gedeelde instellingen voor Clean The Library [Nightmare].
+-- Gedeelde instellingen voor Shush! The Midnight Library.
 -- Pas hier getallen aan om het spel makkelijker of moeilijker te maken.
 
 export type Section = {
@@ -34,7 +34,7 @@ export type KeyInfo = {
 
 local Config = {}
 
-Config.GameName = "Clean The Library 📖 [Nightmare]"
+Config.GameName = "Shush! The Midnight Library"
 
 -- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
 Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start

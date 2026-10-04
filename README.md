@@ -1,6 +1,6 @@
-# Clean The Library 📖 [Nightmare]
+# Shush! The Midnight Library 📖
 
-Een namaak van het Roblox-spel **Clean The Library** (van de groep *Retro Library*), in een **Nightmare**-versie met een monster.
+Een Roblox-spel geïnspireerd op **Clean The Library** (van de groep *Retro Library*), met een eigen draai: een spookbibliotheek bij nacht met een monster.
 Alle tekst in het spel is in het **Engels**; deze uitleg is in het Nederlands.
 Het origineel speel je hier: <https://www.roblox.com/games/109881277752094/Clean-The-Library>.
 
@@ -10,7 +10,7 @@ voordat de tijd op is. Maar **wees stil**: *The Librarian* sluipt door de gangen
 ## Snel spelen
 
 1. Open **Roblox Studio**.
-2. Kies *File → Open from File…* en open `build/CleanTheLibraryNightmare.rbxlx`.
+2. Kies *File → Open from File…* en open `build/ShushTheMidnightLibrary.rbxlx`.
 3. Druk op **Play** (F5).
 
 ## Samen spelen
@@ -172,7 +172,7 @@ de hal staat rond het punt (0, 0, 0) en is 140 × 100 studs; de zalen staan bij 
 Het project gebruikt [Rojo](https://rojo.space/) 7.4. Na een wijziging in `src/`:
 
 ```sh
-rojo build default.project.json -o build/CleanTheLibraryNightmare.rbxlx   # nieuw place-bestand
+rojo build default.project.json -o build/ShushTheMidnightLibrary.rbxlx   # nieuw place-bestand
 rojo serve                                                                # of: live synchroniseren met de Rojo-plugin in Studio
 ```
 

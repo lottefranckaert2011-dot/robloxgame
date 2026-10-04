@@ -4,6 +4,7 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 
+-- Deze naam blijft hetzelfde (ook na het hernoemen van het spel), anders raken spelers hun munten kwijt
 local STORE_NAME = "CleanTheLibraryNightmare_v1"
 
 export type Profile = {
