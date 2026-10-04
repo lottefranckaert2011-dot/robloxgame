@@ -1,5 +1,5 @@
 --!strict
--- Gedeelde instellingen voor Shush! The Midnight Library.
+-- Gedeelde instellingen voor The Library Never Sleeps.
 -- Pas hier getallen aan om het spel makkelijker of moeilijker te maken.
 
 export type Section = {
@@ -34,7 +34,7 @@ export type KeyInfo = {
 
 local Config = {}
 
-Config.GameName = "Shush! The Midnight Library"
+Config.GameName = "The Library Never Sleeps"
 
 -- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
 Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start

@@ -1,4 +1,4 @@
-# Shush! The Midnight Library 📖
+# The Library Never Sleeps 📖
 
 Een Roblox-spel geïnspireerd op **Clean The Library** (van de groep *Retro Library*), met een eigen draai: een spookbibliotheek bij nacht met een monster.
 Alle tekst in het spel is in het **Engels**; deze uitleg is in het Nederlands.
@@ -10,7 +10,7 @@ voordat de tijd op is. Maar **wees stil**: *The Librarian* sluipt door de gangen
 ## Snel spelen
 
 1. Open **Roblox Studio**.
-2. Kies *File → Open from File…* en open `build/ShushTheMidnightLibrary.rbxlx`.
+2. Kies *File → Open from File…* en open `build/TheLibraryNeverSleeps.rbxlx`.
 3. Druk op **Play** (F5).
 
 ## Samen spelen
@@ -172,7 +172,7 @@ de hal staat rond het punt (0, 0, 0) en is 140 × 100 studs; de zalen staan bij 
 Het project gebruikt [Rojo](https://rojo.space/) 7.4. Na een wijziging in `src/`:
 
 ```sh
-rojo build default.project.json -o build/ShushTheMidnightLibrary.rbxlx   # nieuw place-bestand
+rojo build default.project.json -o build/TheLibraryNeverSleeps.rbxlx   # nieuw place-bestand
 rojo serve                                                                # of: live synchroniseren met de Rojo-plugin in Studio
 ```
 

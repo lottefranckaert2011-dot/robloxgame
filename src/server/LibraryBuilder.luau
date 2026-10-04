@@ -507,7 +507,7 @@ local function buildStructure(parent: Model)
 	label.Font = Enum.Font.Garamond
 	label.TextScaled = true
 	label.TextColor3 = GOLD
-	label.Text = "📖 Shush! The Midnight Library"
+	label.Text = "📖 The Library Never Sleeps"
 	label.Parent = gui
 
 	-- Kleed bij de ingang

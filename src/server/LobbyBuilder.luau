@@ -362,7 +362,7 @@ local function buildBigBook(folder: Folder)
 	title.Font = Enum.Font.Garamond
 	title.TextScaled = true
 	title.TextColor3 = GOLD
-	title.Text = "Shush!\nThe Midnight\nLibrary"
+	title.Text = "The Library\nNever Sleeps"
 	title.Parent = gui
 end
 

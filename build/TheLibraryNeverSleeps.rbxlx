@@ -17,7 +17,7 @@
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--!strict
--- Gedeelde instellingen voor Shush! The Midnight Library.
+-- Gedeelde instellingen voor The Library Never Sleeps.
 -- Pas hier getallen aan om het spel makkelijker of moeilijker te maken.
 
 export type Section = {
@@ -52,7 +52,7 @@ export type KeyInfo = {
 
 local Config = {}
 
-Config.GameName = "Shush! The Midnight Library"
+Config.GameName = "The Library Never Sleeps"
 
 -- Ronde (per zaal staan de tijd en het aantal boeken bij Config.Rooms)
 Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start
@@ -2364,7 +2364,7 @@ local function buildStructure(parent: Model)
 	label.Font = Enum.Font.Garamond
 	label.TextScaled = true
 	label.TextColor3 = GOLD
-	label.Text = "📖 Shush! The Midnight Library"
+	label.Text = "📖 The Library Never Sleeps"
 	label.Parent = gui
 
 	-- Kleed bij de ingang
@@ -3330,7 +3330,7 @@ local function buildBigBook(folder: Folder)
 	title.Font = Enum.Font.Garamond
 	title.TextScaled = true
 	title.TextColor3 = GOLD
-	title.Text = "Shush!\nThe Midnight\nLibrary"
+	title.Text = "The Library\nNever Sleeps"
 	title.Parent = gui
 end
 
