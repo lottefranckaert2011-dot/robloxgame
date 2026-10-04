@@ -54,7 +54,7 @@ local function insight(): boolean
 	local room = roomModel()
 	local books = room and room:FindFirstChild("Books")
 	if not root or not books then
-		Hud.Notify("Ga eerst een zaal in.", Color3.fromRGB(220, 220, 220))
+		Hud.Notify("Enter a hall first.", Color3.fromRGB(220, 220, 220))
 		return false
 	end
 	local markers = {}
@@ -85,7 +85,7 @@ local function insight(): boolean
 			table.insert(markers, bb)
 		end
 	end
-	Hud.Notify(string.format("👁 Inzicht: %d boeken in de buurt", found), Color3.fromRGB(255, 225, 120))
+	Hud.Notify(string.format("👁 Insight: %d books nearby", found), Color3.fromRGB(255, 225, 120))
 	task.delay(Config.InsightDuration, function()
 		for _, bb in markers do
 			bb:Destroy()
@@ -98,7 +98,7 @@ end
 local function shelfGuide(): boolean
 	local book = Controls.Inventory[1]
 	if not book then
-		Hud.Notify("Pak eerst een boek op.", Color3.fromRGB(220, 220, 220))
+		Hud.Notify("Pick up a book first.", Color3.fromRGB(220, 220, 220))
 		return false
 	end
 	local root = getRoot()
@@ -144,7 +144,7 @@ local function shelfGuide(): boolean
 	label.Parent = bb
 	bb.Parent = player:WaitForChild("PlayerGui")
 
-	Hud.Notify("🧭 Volg het licht naar " .. book.Code, color)
+	Hud.Notify("🧭 Follow the light to " .. book.Code, color)
 	task.delay(Config.ShelfGuideDuration, function()
 		beam:Destroy()
 		a0:Destroy()
@@ -160,17 +160,17 @@ local function useAbility(id: string)
 		return
 	end
 	if not player:GetAttribute("Magic_" .. id) then
-		Hud.Notify(string.format("🔒 %s is nog op slot. Koop het bij Magie (C).", info.Name), Color3.fromRGB(255, 200, 120))
+		Hud.Notify(string.format("🔒 %s is still locked. Buy it in Magic (C).", info.Name), Color3.fromRGB(255, 200, 120))
 		return
 	end
 	local now = os.clock()
 	local wait = (cooldownUntil[id] or 0) - now
 	if wait > 0 then
-		Hud.Notify(string.format("⏳ %s: nog %d s wachten", info.Name, math.ceil(wait)), Color3.fromRGB(200, 200, 220))
+		Hud.Notify(string.format("⏳ %s: wait %d more seconds", info.Name, math.ceil(wait)), Color3.fromRGB(200, 200, 220))
 		return
 	end
 	if not roomModel() then
-		Hud.Notify("Magie werkt alleen in een zaal. Kies eerst een zaal!", Color3.fromRGB(220, 220, 220))
+		Hud.Notify("Magic only works inside a hall. Choose a hall first!", Color3.fromRGB(220, 220, 220))
 		return
 	end
 	local used = true
@@ -181,7 +181,7 @@ local function useAbility(id: string)
 	elseif id == "AutoShelf" then
 		-- Zonder boeken in je handen heeft het geen zin (en verspil je de afkoeltijd niet)
 		if #Controls.Inventory == 0 then
-			Hud.Notify("✨ Pak eerst boeken op, dan vliegen ze vanzelf naar hun kast.", Color3.fromRGB(255, 230, 140))
+			Hud.Notify("✨ Pick up some books first, then they will fly to their shelves.", Color3.fromRGB(255, 230, 140))
 			return
 		end
 		Remotes.Action:FireServer("Ability", id)

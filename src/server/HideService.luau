@@ -23,7 +23,7 @@ function HideService.Exit(player: Player)
 	end
 	hidingIn[player] = nil
 	occupant[locker] = nil
-	locker.Prompt.ActionText = "Verstoppen"
+	locker.Prompt.ActionText = "Hide"
 	player:SetAttribute("Hidden", nil)
 	local character = player.Character
 	local root = getRoot(player)
@@ -41,16 +41,16 @@ local function enter(player: Player, locker)
 		return
 	end
 	if occupant[locker] then
-		Remotes.Notify:FireClient(player, "Hier zit al iemand in!", Color3.fromRGB(255, 200, 120))
+		Remotes.Notify:FireClient(player, "Someone is already hiding in here!", Color3.fromRGB(255, 200, 120))
 		return
 	end
 	hidingIn[player] = locker
 	occupant[locker] = player
-	locker.Prompt.ActionText = "Eruit"
+	locker.Prompt.ActionText = "Get out"
 	player:SetAttribute("Hidden", true)
 	character:PivotTo(locker.Inside)
 	root.Anchored = true
-	Remotes.Notify:FireClient(player, "Je zit verstopt. Houd je adem in...", Color3.fromRGB(180, 180, 255))
+	Remotes.Notify:FireClient(player, "You are hiding. Hold your breath...", Color3.fromRGB(180, 180, 255))
 end
 
 function HideService.AddLibrary(library)
@@ -73,7 +73,7 @@ function HideService.Init()
 			if locker then
 				hidingIn[player] = nil
 				occupant[locker] = nil
-				locker.Prompt.ActionText = "Verstoppen"
+				locker.Prompt.ActionText = "Hide"
 			end
 			player:SetAttribute("Hidden", nil)
 		end)
@@ -86,7 +86,7 @@ function HideService.Init()
 		local locker = hidingIn[player]
 		if locker then
 			occupant[locker] = nil
-			locker.Prompt.ActionText = "Verstoppen"
+			locker.Prompt.ActionText = "Hide"
 		end
 		hidingIn[player] = nil
 	end)

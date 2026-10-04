@@ -289,9 +289,9 @@ function BookService.MakeLooseBook(self: BookService, book: BookData, surface: C
 	p:SetAttribute("Title", book.Title)
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Oppakken"
+	prompt.ActionText = "Pick up"
 	prompt.ObjectText = if book.Volume
-		then string.format("[%s] %s (deel %d van %d)", book.Code, book.Title, book.Volume, Config.SeriesLength)
+		then string.format("[%s] %s (vol. %d of %d)", book.Code, book.Title, book.Volume, Config.SeriesLength)
 		else string.format("[%s] %s", book.Code, book.Title)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 9
@@ -323,7 +323,7 @@ function BookService.PickUp(self: BookService, player: Player, bookPart: BasePar
 	end
 	if #list >= getCapacity(player) then
 		if not silent then
-			notify(player, "Je handen zijn vol! Zet eerst boeken terug.", Color3.fromRGB(255, 120, 80))
+			notify(player, "Your hands are full! Shelve some books first.", Color3.fromRGB(255, 120, 80))
 		end
 		return false
 	end
@@ -389,10 +389,10 @@ function BookService.AfterPlaced(self: BookService, player: Player, section, pla
 	end
 	if (self.PlacedPerSection[section.Code] or 0) >= self.Room.BooksPerSection then
 		for other in self.Carried do
-			notify(other, string.format("Sectie %s %s is compleet!", section.Code, section.Name), Color3.fromRGB(150, 255, 160))
+			notify(other, string.format("Section %s %s is complete!", section.Code, section.Name), Color3.fromRGB(150, 255, 160))
 		end
 	elseif not quiet then
-		notify(player, string.format("+%d boek%s in %s", placedNow, if placedNow == 1 then "" else "en", section.Name), Color3.fromRGB(120, 255, 140))
+		notify(player, string.format("+%d book%s in %s", placedNow, if placedNow == 1 then "" else "s", section.Name), Color3.fromRGB(120, 255, 140))
 	end
 	if self.Placed >= self.Total and self.OnAllPlaced then
 		self.OnAllPlaced()
@@ -437,7 +437,7 @@ end
 -- Melding als een deel van een serie nog niet mag
 function BookService.NotifyWaiting(self: BookService, player: Player, code: string)
 	local nextVolume = (self.SeriesPlaced[code] or 0) + 1
-	notify(player, string.format("📚 Serie op volgorde! Zet eerst deel %d terug.", nextVolume), SERIES_GOLD)
+	notify(player, string.format("📚 Series in order! Shelve volume %d first.", nextVolume), SERIES_GOLD)
 end
 
 function BookService.Place(self: BookService, player: Player, code: string)
@@ -450,7 +450,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 		return
 	end
 	if #list == 0 then
-		notify(player, "Je draagt geen boeken.", Color3.fromRGB(220, 220, 220))
+		notify(player, "You are not carrying any books.", Color3.fromRGB(220, 220, 220))
 		return
 	end
 
@@ -462,7 +462,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 	if placedNow == 0 and waiting > 0 then
 		return
 	elseif placedNow == 0 then
-		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
+		notify(player, string.format("Wrong shelf! This is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
 			playSound("Wrong", character)
 			local root = getRoot(player)
@@ -732,7 +732,7 @@ function BookService.SpawnAll(self: BookService)
 			table.insert(books, {
 				Id = nextId,
 				Code = section.Code,
-				Title = string.format("De %s-reeks · Deel %d", section.Name, volume),
+				Title = string.format("The %s Saga · Vol. %d", section.Name, volume),
 				Color = seriesColor,
 				Scale = 1.15,
 				Font = seriesFont,

@@ -90,9 +90,9 @@ Config.StaminaRegen = 14 -- per seconde
 Config.CoinsPerBook = 2
 Config.CoinsForWin = 150
 
--- Het monster: "De Bibliothecaresse"
+-- Het monster: "The Librarian"
 Config.Monster = {
-	Name = "De Bibliothecaresse",
+	Name = "The Librarian",
 	WanderSpeed = 11,
 	ChaseSpeedStart = 17,
 	ChaseSpeedEnd = 21, -- sneller naarmate er meer boeken terug staan
@@ -120,36 +120,36 @@ export type MagicInfo = {
 Config.Magic = {
 	{
 		Id = "Insight",
-		Name = "Inzicht",
+		Name = "Insight",
 		Icon = "👁",
-		Description = "Laat alle boeken in de buurt oplichten",
+		Description = "Makes all nearby books light up",
 		Cost = 20,
 		Cooldown = 25,
 		Key = Enum.KeyCode.One,
 	},
 	{
 		Id = "ShelfGuide",
-		Name = "Kastgids",
+		Name = "Shelf Guide",
 		Icon = "🧭",
-		Description = "Een lichtstraal wijst naar de kast van je boek",
+		Description = "A beam of light points to your book's shelf",
 		Cost = 40,
 		Cooldown = 15,
 		Key = Enum.KeyCode.Two,
 	},
 	{
 		Id = "Assemble",
-		Name = "Verzamelen",
+		Name = "Gather",
 		Icon = "🧲",
-		Description = "Trekt de dichtstbijzijnde boeken naar je toe",
+		Description = "Pulls the nearest books towards you",
 		Cost = 120,
 		Cooldown = 30,
 		Key = Enum.KeyCode.Three,
 	},
 	{
 		Id = "AutoShelf",
-		Name = "Auto-plaatsen",
+		Name = "Auto-Shelve",
 		Icon = "✨",
-		Description = "Al je boeken vliegen vanzelf naar de goede kast",
+		Description = "All your books fly to the right shelf by themselves",
 		Cost = 250,
 		Cooldown = 60,
 		Key = Enum.KeyCode.Four,
@@ -175,18 +175,18 @@ export type ShopItem = {
 Config.Shop = {
 	{
 		Id = "Capacity",
-		Name = "Grotere Tas",
+		Name = "Bigger Bag",
 		Icon = "🎒",
-		Description = "+1 boek dragen",
+		Description = "Carry +1 book",
 		BaseCost = 40,
 		CostGrowth = 1.6,
 		MaxLevel = 6,
 	},
 	{
 		Id = "Speed",
-		Name = "Snelle Schoenen",
+		Name = "Fast Shoes",
 		Icon = "👟",
-		Description = "+1,5 loopsnelheid",
+		Description = "+1.5 walk speed",
 		BaseCost = 50,
 		CostGrowth = 1.7,
 		MaxLevel = 5,
@@ -196,7 +196,7 @@ Config.SpeedPerLevel = 1.5
 
 -- Assistent: een magische uil die zelf boeken terugzet
 Config.Assistant = {
-	Name = "Uil Oehoe",
+	Name = "Hoot the Owl",
 	Levels = {
 		{ Cost = 150, Interval = 20 },
 		{ Cost = 400, Interval = 13 },
@@ -238,27 +238,27 @@ end
 Config.Keys = {
 	{
 		Id = "Crimson",
-		Name = "Karmijnrode Achthoek",
+		Name = "Crimson Octagon",
 		Color = Color3.fromRGB(200, 30, 45),
-		Description = "Je springt veel hoger",
+		Description = "You jump much higher",
 	},
 	{
 		Id = "Golden",
-		Name = "Gouden Diamant",
+		Name = "Golden Diamond",
 		Color = Color3.fromRGB(255, 196, 40),
-		Description = "+3 draagcapaciteit",
+		Description = "+3 carry capacity",
 	},
 	{
 		Id = "Azure",
-		Name = "Azuurblauwe Ster",
+		Name = "Azure Star",
 		Color = Color3.fromRGB(40, 140, 255),
-		Description = "+3 draagcapaciteit",
+		Description = "+3 carry capacity",
 	},
 	{
 		Id = "Emerald",
-		Name = "Smaragdgroene Klaver",
+		Name = "Emerald Clover",
 		Color = Color3.fromRGB(30, 200, 90),
-		Description = "Je sprint veel sneller",
+		Description = "You sprint much faster",
 	},
 } :: { KeyInfo }
 
@@ -322,46 +322,46 @@ end
 
 -- 31 kastsecties: 1A–1N op de begane grond, 2A–2Q op de eerste verdieping
 Config.Sections = {
-	{ Code = "1A", Name = "Studio", Floor = 1, Titles = { "Mijn Eerste Script", "Parts & Welds", "Debuggen om Middernacht" } },
-	{ Code = "1B", Name = "Simulators", Floor = 1, Titles = { "Klik 1 Miljoen Keer", "Rebirth Geheimen", "Huisdieren Simulator Gids" } },
-	{ Code = "1C", Name = "Avatar & Catalogus", Floor = 1, Titles = { "Hoeden door de Eeuwen", "De Perfecte Outfit", "Dominus Dromen" } },
-	{ Code = "1D", Name = "Mythes", Floor = 1, Titles = { "Het Verhaal van Guest 666", "Legendes van de Oude Server", "De Verloren Badge" } },
-	{ Code = "1E", Name = "DevEx", Floor = 1, Titles = { "Robux naar Euro", "Rijk met Games", "Het Grote Uitbetaalboek" } },
-	{ Code = "1F", Name = "Regels & Moderatie", Floor = 1, Titles = { "Wees Vriendelijk", "Het Verbanboek", "Rapporteren voor Beginners" } },
-	{ Code = "1G", Name = "Obby & Parkour", Floor = 1, Titles = { "Lava is Heet", "1000 Stages Later", "Springen als een Pro" } },
-	{ Code = "1H", Name = "Horror", Floor = 1, Titles = { "Het Krakende Trapgat", "Ogen in het Donker", "Wie Fluistert Daar?" } },
-	{ Code = "1I", Name = "Economie & Handel", Floor = 1, Titles = { "Ruilen Zonder Scams", "Vraag en Aanbod", "De Limited Markt" } },
-	{ Code = "1J", Name = "Geschiedenis", Floor = 1, Titles = { "Roblox in 2006", "Kastelen en Ridders", "De Oude Bibliotheek" } },
-	{ Code = "1K", Name = "Kookboeken", Floor = 1, Titles = { "Pizza Fabriek Recepten", "Taart voor Noobs", "Soep van de Heks" } },
-	{ Code = "1L", Name = "Sprookjes", Floor = 1, Titles = { "De Slapende Bibliothecaris", "Drie Kleine Noobs", "Het Gouden Boek" } },
-	{ Code = "1M", Name = "Ruimtevaart", Floor = 1, Titles = { "Raketten Bouwen", "Leven op Mars", "Zwarte Gaten" } },
-	{ Code = "1N", Name = "Dieren", Floor = 1, Titles = { "Katten Weten Alles", "De Slimme Uil", "Onder de Zee" } },
+	{ Code = "1A", Name = "Studio", Floor = 1, Titles = { "My First Script", "Parts & Welds", "Debugging at Midnight" } },
+	{ Code = "1B", Name = "Simulators", Floor = 1, Titles = { "Click a Million Times", "Rebirth Secrets", "Pet Simulator Guide" } },
+	{ Code = "1C", Name = "Avatar & Catalog", Floor = 1, Titles = { "Hats Through the Ages", "The Perfect Outfit", "Dominus Dreams" } },
+	{ Code = "1D", Name = "Myths", Floor = 1, Titles = { "The Tale of Guest 666", "Legends of the Old Server", "The Lost Badge" } },
+	{ Code = "1E", Name = "DevEx", Floor = 1, Titles = { "Robux to Real Money", "Rich from Games", "The Big Payout Book" } },
+	{ Code = "1F", Name = "Rules & Moderation", Floor = 1, Titles = { "Be Kind", "The Ban Book", "Reporting for Beginners" } },
+	{ Code = "1G", Name = "Obby & Parkour", Floor = 1, Titles = { "Lava Is Hot", "1000 Stages Later", "Jump Like a Pro" } },
+	{ Code = "1H", Name = "Horror", Floor = 1, Titles = { "The Creaking Stairs", "Eyes in the Dark", "Who Whispers There?" } },
+	{ Code = "1I", Name = "Economy & Trading", Floor = 1, Titles = { "Trading Without Scams", "Supply and Demand", "The Limited Market" } },
+	{ Code = "1J", Name = "History", Floor = 1, Titles = { "Roblox in 2006", "Castles and Knights", "The Old Library" } },
+	{ Code = "1K", Name = "Cookbooks", Floor = 1, Titles = { "Pizza Factory Recipes", "Cake for Noobs", "The Witch's Soup" } },
+	{ Code = "1L", Name = "Fairy Tales", Floor = 1, Titles = { "The Sleeping Librarian", "Three Little Noobs", "The Golden Book" } },
+	{ Code = "1M", Name = "Space", Floor = 1, Titles = { "Building Rockets", "Life on Mars", "Black Holes" } },
+	{ Code = "1N", Name = "Animals", Floor = 1, Titles = { "Cats Know Everything", "The Wise Owl", "Under the Sea" } },
 
-	{ Code = "2A", Name = "Magie", Floor = 2, Titles = { "Spreuken voor Opruimen", "De Zwevende Boeken", "Toverstokken Kiezen" } },
-	{ Code = "2B", Name = "Anime", Floor = 2, Titles = { "Krachtige Kreten", "De Laatste Aflevering", "Ninja Stappen" } },
-	{ Code = "2C", Name = "Meditatie", Floor = 2, Titles = { "Adem In, Adem Uit", "Stilte in de Bibliotheek", "Rust in je Hoofd" } },
-	{ Code = "2D", Name = "Leger", Floor = 2, Titles = { "Tanks en Torens", "Strategie Handboek", "De Grote Verdediging" } },
-	{ Code = "2E", Name = "Brainrot", Floor = 2, Titles = { "Skibidi Wetenschap", "Sigma Grindset", "Wat Zei Hij Nou?" } },
-	{ Code = "2F", Name = "Pretparken", Floor = 2, Titles = { "Achtbanen Ontwerpen", "Suikerspin Rijk", "Het Spookhuis" } },
-	{ Code = "2G", Name = "Techniek", Floor = 2, Titles = { "Tandwielen en Hendels", "Bruggen die Blijven Staan", "Robots Bouwen" } },
-	{ Code = "2H", Name = "Wetenschap", Floor = 2, Titles = { "Explosieve Proefjes", "Het Atoom", "Waarom is de Lucht Blauw?" } },
-	{ Code = "2I", Name = "Piraten", Floor = 2, Titles = { "Schatkaarten Lezen", "Kapitein Krakeling", "Het Vervloekte Schip" } },
-	{ Code = "2J", Name = "Dino's", Floor = 2, Titles = { "T-Rex Tanden", "Fossielen Zoeken", "De Laatste Dino" } },
-	{ Code = "2K", Name = "Sport", Floor = 2, Titles = { "Voetbal Trucs", "Sneller Rennen", "De Grote Finale" } },
-	{ Code = "2L", Name = "Muziek", Floor = 2, Titles = { "Piano voor Spoken", "Beats Maken", "Het Stille Orkest" } },
-	{ Code = "2M", Name = "Kunst", Floor = 2, Titles = { "Schilderen in het Donker", "Beeldhouwen met Blokken", "Kleuren Mengen" } },
-	{ Code = "2N", Name = "Detectives", Floor = 2, Titles = { "Wie Stal het Boek?", "Vingerafdrukken", "Het Raadsel van Kast 13" } },
-	{ Code = "2O", Name = "Spoken", Floor = 2, Titles = { "Spoken Tellen", "Het Koude Hoekje", "Boe!" } },
-	{ Code = "2P", Name = "Vervloekte Boeken", Floor = 2, Titles = { "Lees Mij Niet", "Het Boek dat Terugkijkt", "Bladzijde 666" } },
-	{ Code = "2Q", Name = "Verboden Archief", Floor = 2, Titles = { "Shhhhh...", "De Regels van de Bibliothecaresse", "Nooit Meer Rennen" } },
+	{ Code = "2A", Name = "Magic", Floor = 2, Titles = { "Spells for Tidying Up", "The Floating Books", "Choosing a Wand" } },
+	{ Code = "2B", Name = "Anime", Floor = 2, Titles = { "Powerful Battle Cries", "The Final Episode", "Ninja Steps" } },
+	{ Code = "2C", Name = "Meditation", Floor = 2, Titles = { "Breathe In, Breathe Out", "Silence in the Library", "A Calm Mind" } },
+	{ Code = "2D", Name = "Military", Floor = 2, Titles = { "Tanks and Towers", "Strategy Handbook", "The Great Defense" } },
+	{ Code = "2E", Name = "Brainrot", Floor = 2, Titles = { "Skibidi Science", "Sigma Grindset", "What Did He Just Say?" } },
+	{ Code = "2F", Name = "Theme Parks", Floor = 2, Titles = { "Designing Roller Coasters", "Cotton Candy Empire", "The Haunted House" } },
+	{ Code = "2G", Name = "Engineering", Floor = 2, Titles = { "Gears and Levers", "Bridges That Stay Up", "Building Robots" } },
+	{ Code = "2H", Name = "Science", Floor = 2, Titles = { "Explosive Experiments", "The Atom", "Why Is the Sky Blue?" } },
+	{ Code = "2I", Name = "Pirates", Floor = 2, Titles = { "Reading Treasure Maps", "Captain Crumpet", "The Cursed Ship" } },
+	{ Code = "2J", Name = "Dinosaurs", Floor = 2, Titles = { "T-Rex Teeth", "Fossil Hunting", "The Last Dino" } },
+	{ Code = "2K", Name = "Sports", Floor = 2, Titles = { "Football Tricks", "Run Faster", "The Grand Final" } },
+	{ Code = "2L", Name = "Music", Floor = 2, Titles = { "Piano for Ghosts", "Making Beats", "The Silent Orchestra" } },
+	{ Code = "2M", Name = "Art", Floor = 2, Titles = { "Painting in the Dark", "Sculpting with Blocks", "Mixing Colors" } },
+	{ Code = "2N", Name = "Detectives", Floor = 2, Titles = { "Who Stole the Book?", "Fingerprints", "The Riddle of Shelf 13" } },
+	{ Code = "2O", Name = "Ghosts", Floor = 2, Titles = { "Counting Ghosts", "The Cold Corner", "Boo!" } },
+	{ Code = "2P", Name = "Cursed Books", Floor = 2, Titles = { "Do Not Read Me", "The Book That Looks Back", "Page 666" } },
+	{ Code = "2Q", Name = "Forbidden Archive", Floor = 2, Titles = { "Shhhhh...", "The Librarian's Rules", "Never Run Again" } },
 } :: { Section }
 
 -- De zalen waaruit je in de hal kunt kiezen
 Config.Rooms = {
 	{
 		Id = "Starter",
-		Name = "Starterzaal",
-		Description = "1 verdieping · 12 kasten · geen monster",
+		Name = "Starter Hall",
+		Description = "1 floor · 12 shelves · no monster",
 		Color = Color3.fromRGB(90, 210, 120),
 		Floors = 1,
 		MaxSections = 12,
@@ -375,8 +375,8 @@ Config.Rooms = {
 	},
 	{
 		Id = "Classic",
-		Name = "Grote Zaal",
-		Description = "2 verdiepingen · 31 kasten · De Bibliothecaresse",
+		Name = "Grand Hall",
+		Description = "2 floors · 31 shelves · The Librarian",
 		Color = Color3.fromRGB(90, 160, 255),
 		Floors = 2,
 		MaxSections = 31,
@@ -390,8 +390,8 @@ Config.Rooms = {
 	},
 	{
 		Id = "Nightmare",
-		Name = "Nachtmerriezaal",
-		Description = "Pikdonker · sneller monster · dubbele munten",
+		Name = "Nightmare Hall",
+		Description = "Pitch dark · faster monster · double coins",
 		Color = Color3.fromRGB(220, 60, 90),
 		Floors = 2,
 		MaxSections = 31,
@@ -598,7 +598,7 @@ DataService.Init()
 RoomService.Init(lobby) -- bouwt de zalen
 ShopService.Init()
 
-print(Config.GameName .. " is gestart!")
+print(Config.GameName .. " has started!")
 ]]></string>
       </Properties>
       <Item class="ModuleScript" referent="8">
@@ -895,9 +895,9 @@ function BookService.MakeLooseBook(self: BookService, book: BookData, surface: C
 	p:SetAttribute("Title", book.Title)
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Oppakken"
+	prompt.ActionText = "Pick up"
 	prompt.ObjectText = if book.Volume
-		then string.format("[%s] %s (deel %d van %d)", book.Code, book.Title, book.Volume, Config.SeriesLength)
+		then string.format("[%s] %s (vol. %d of %d)", book.Code, book.Title, book.Volume, Config.SeriesLength)
 		else string.format("[%s] %s", book.Code, book.Title)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 9
@@ -929,7 +929,7 @@ function BookService.PickUp(self: BookService, player: Player, bookPart: BasePar
 	end
 	if #list >= getCapacity(player) then
 		if not silent then
-			notify(player, "Je handen zijn vol! Zet eerst boeken terug.", Color3.fromRGB(255, 120, 80))
+			notify(player, "Your hands are full! Shelve some books first.", Color3.fromRGB(255, 120, 80))
 		end
 		return false
 	end
@@ -995,10 +995,10 @@ function BookService.AfterPlaced(self: BookService, player: Player, section, pla
 	end
 	if (self.PlacedPerSection[section.Code] or 0) >= self.Room.BooksPerSection then
 		for other in self.Carried do
-			notify(other, string.format("Sectie %s %s is compleet!", section.Code, section.Name), Color3.fromRGB(150, 255, 160))
+			notify(other, string.format("Section %s %s is complete!", section.Code, section.Name), Color3.fromRGB(150, 255, 160))
 		end
 	elseif not quiet then
-		notify(player, string.format("+%d boek%s in %s", placedNow, if placedNow == 1 then "" else "en", section.Name), Color3.fromRGB(120, 255, 140))
+		notify(player, string.format("+%d book%s in %s", placedNow, if placedNow == 1 then "" else "s", section.Name), Color3.fromRGB(120, 255, 140))
 	end
 	if self.Placed >= self.Total and self.OnAllPlaced then
 		self.OnAllPlaced()
@@ -1043,7 +1043,7 @@ end
 -- Melding als een deel van een serie nog niet mag
 function BookService.NotifyWaiting(self: BookService, player: Player, code: string)
 	local nextVolume = (self.SeriesPlaced[code] or 0) + 1
-	notify(player, string.format("📚 Serie op volgorde! Zet eerst deel %d terug.", nextVolume), SERIES_GOLD)
+	notify(player, string.format("📚 Series in order! Shelve volume %d first.", nextVolume), SERIES_GOLD)
 end
 
 function BookService.Place(self: BookService, player: Player, code: string)
@@ -1056,7 +1056,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 		return
 	end
 	if #list == 0 then
-		notify(player, "Je draagt geen boeken.", Color3.fromRGB(220, 220, 220))
+		notify(player, "You are not carrying any books.", Color3.fromRGB(220, 220, 220))
 		return
 	end
 
@@ -1068,7 +1068,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 	if placedNow == 0 and waiting > 0 then
 		return
 	elseif placedNow == 0 then
-		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
+		notify(player, string.format("Wrong shelf! This is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
 			playSound("Wrong", character)
 			local root = getRoot(player)
@@ -1338,7 +1338,7 @@ function BookService.SpawnAll(self: BookService)
 			table.insert(books, {
 				Id = nextId,
 				Code = section.Code,
-				Title = string.format("De %s-reeks · Deel %d", section.Name, volume),
+				Title = string.format("The %s Saga · Vol. %d", section.Name, volume),
 				Color = seriesColor,
 				Scale = 1.15,
 				Font = seriesFont,
@@ -1408,7 +1408,7 @@ do
 	if ok then
 		store = result
 	else
-		warn("[Data] DataStore niet beschikbaar, voortgang wordt niet opgeslagen: " .. tostring(result))
+		warn("[Data] DataStore unavailable, progress will not be saved: " .. tostring(result))
 	end
 end
 
@@ -1448,7 +1448,7 @@ local function load(player: Player): Profile
 				end
 			end
 		elseif not ok then
-			warn("[Data] Laden mislukt voor " .. player.Name .. ": " .. tostring(data))
+			warn("[Data] Loading failed for " .. player.Name .. ": " .. tostring(data))
 		end
 	end
 	return profile
@@ -1463,7 +1463,7 @@ local function save(player: Player)
 		store:SetAsync("player_" .. player.UserId, profile)
 	end)
 	if not ok then
-		warn("[Data] Opslaan mislukt voor " .. player.Name .. ": " .. tostring(err))
+		warn("[Data] Saving failed for " .. player.Name .. ": " .. tostring(err))
 	end
 end
 
@@ -1477,7 +1477,7 @@ local function updateStats(player: Player)
 	if not profile or not stats then
 		return
 	end
-	local coins = stats:FindFirstChild("Munten") :: IntValue?
+	local coins = stats:FindFirstChild("Coins") :: IntValue?
 	if coins then
 		coins.Value = profile.Coins
 	end
@@ -1505,7 +1505,7 @@ end
 
 function DataService.SetRoundBooks(player: Player, value: number)
 	local stats = player:FindFirstChild("leaderstats")
-	local books = stats and stats:FindFirstChild("Boeken") :: IntValue?
+	local books = stats and stats:FindFirstChild("Books") :: IntValue?
 	if books then
 		books.Value = value
 	end
@@ -1513,7 +1513,7 @@ end
 
 function DataService.GetRoundBooks(player: Player): number
 	local stats = player:FindFirstChild("leaderstats")
-	local books = stats and stats:FindFirstChild("Boeken") :: IntValue?
+	local books = stats and stats:FindFirstChild("Books") :: IntValue?
 	return if books then books.Value else 0
 end
 
@@ -1521,10 +1521,10 @@ local function onPlayerAdded(player: Player)
 	local stats = Instance.new("Folder")
 	stats.Name = "leaderstats"
 	local books = Instance.new("IntValue")
-	books.Name = "Boeken"
+	books.Name = "Books"
 	books.Parent = stats
 	local coins = Instance.new("IntValue")
-	coins.Name = "Munten"
+	coins.Name = "Coins"
 	coins.Parent = stats
 	stats.Parent = player
 
@@ -1596,7 +1596,7 @@ function HideService.Exit(player: Player)
 	end
 	hidingIn[player] = nil
 	occupant[locker] = nil
-	locker.Prompt.ActionText = "Verstoppen"
+	locker.Prompt.ActionText = "Hide"
 	player:SetAttribute("Hidden", nil)
 	local character = player.Character
 	local root = getRoot(player)
@@ -1614,16 +1614,16 @@ local function enter(player: Player, locker)
 		return
 	end
 	if occupant[locker] then
-		Remotes.Notify:FireClient(player, "Hier zit al iemand in!", Color3.fromRGB(255, 200, 120))
+		Remotes.Notify:FireClient(player, "Someone is already hiding in here!", Color3.fromRGB(255, 200, 120))
 		return
 	end
 	hidingIn[player] = locker
 	occupant[locker] = player
-	locker.Prompt.ActionText = "Eruit"
+	locker.Prompt.ActionText = "Get out"
 	player:SetAttribute("Hidden", true)
 	character:PivotTo(locker.Inside)
 	root.Anchored = true
-	Remotes.Notify:FireClient(player, "Je zit verstopt. Houd je adem in...", Color3.fromRGB(180, 180, 255))
+	Remotes.Notify:FireClient(player, "You are hiding. Hold your breath...", Color3.fromRGB(180, 180, 255))
 end
 
 function HideService.AddLibrary(library)
@@ -1646,7 +1646,7 @@ function HideService.Init()
 			if locker then
 				hidingIn[player] = nil
 				occupant[locker] = nil
-				locker.Prompt.ActionText = "Verstoppen"
+				locker.Prompt.ActionText = "Hide"
 			end
 			player:SetAttribute("Hidden", nil)
 		end)
@@ -1659,7 +1659,7 @@ function HideService.Init()
 		local locker = hidingIn[player]
 		if locker then
 			occupant[locker] = nil
-			locker.Prompt.ActionText = "Verstoppen"
+			locker.Prompt.ActionText = "Hide"
 		end
 		hidingIn[player] = nil
 	end)
@@ -1760,7 +1760,7 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 	light.Parent = p
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Oprapen"
+	prompt.ActionText = "Pick up"
 	prompt.ObjectText = info.Name
 	prompt.HoldDuration = 0.5
 	prompt.MaxActivationDistance = 8
@@ -1773,13 +1773,13 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 			roundKeys[player] = keys
 		end
 		if keys[info.Id] then
-			Remotes.Notify:FireClient(player, "Deze sleutel heb je al.", Color3.fromRGB(200, 200, 200))
+			Remotes.Notify:FireClient(player, "You already have this key.", Color3.fromRGB(200, 200, 200))
 			return
 		end
 		keys[info.Id] = true
 		applyUpgrades(player)
 		Sounds.Play("Key", p, 0.8)
-		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s (deze ronde)", info.Name, info.Description), info.Color)
+		Remotes.Notify:FireClient(player, string.format("🔑 %s found! %s (this round)", info.Name, info.Description), info.Color)
 	end)
 
 	-- Langzaam ronddraaien en zweven
@@ -2503,7 +2503,7 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 		att.Position = Vector3.new(x, -2, 0)
 		att.Parent = front
 		local prompt = Instance.new("ProximityPrompt")
-		prompt.ActionText = "Boeken terugzetten"
+		prompt.ActionText = "Shelve books"
 		prompt.ObjectText = title
 		prompt.HoldDuration = 0.2
 		prompt.MaxActivationDistance = 9
@@ -2658,8 +2658,8 @@ local function buildLocker(parent: Folder, pos: Vector3, facing: Vector3): Locke
 	})
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Verstoppen"
-	prompt.ObjectText = "Kast"
+	prompt.ActionText = "Hide"
+	prompt.ObjectText = "Wardrobe"
 	prompt.HoldDuration = 0.3
 	prompt.MaxActivationDistance = 7
 	prompt.RequiresLineOfSight = false
@@ -2724,8 +2724,8 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 
 	-- Deur terug naar de hal
 	local exitPrompt = Instance.new("ProximityPrompt")
-	exitPrompt.ActionText = "Terug naar de hal"
-	exitPrompt.ObjectText = "Deur"
+	exitPrompt.ActionText = "Back to the lobby"
+	exitPrompt.ObjectText = "Door"
 	exitPrompt.HoldDuration = 0.5
 	exitPrompt.MaxActivationDistance = 12
 	exitPrompt.RequiresLineOfSight = false
@@ -3374,7 +3374,7 @@ local function buildStand(folder: Folder, position: Vector3, facing: Vector3, ti
 	signText(sign, Enum.NormalId.Front, title, color)
 	signText(sign, Enum.NormalId.Back, title, color)
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Openen"
+	prompt.ActionText = "Open"
 	prompt.ObjectText = title
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
@@ -3499,7 +3499,7 @@ local function buildDoor(folder: Folder, room: Config.RoomInfo, x: number): Door
 	light.Parent = zone
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Naar binnen"
+	prompt.ActionText = "Enter"
 	prompt.ObjectText = room.Name
 	prompt.HoldDuration = 0.2
 	prompt.MaxActivationDistance = 12
@@ -3529,12 +3529,12 @@ function LobbyBuilder.Build(parent: Instance): Lobby
 		buildPlant(folder, spot)
 	end
 
-	buildStand(folder, Vector3.new(-58, 0, 12), Vector3.new(1, 0, 0), "WINKEL", Color3.fromRGB(255, 110, 200), "Shop")
-	buildStand(folder, Vector3.new(58, 0, 12), Vector3.new(-1, 0, 0), "MAGIE", Color3.fromRGB(110, 190, 255), "Magic")
+	buildStand(folder, Vector3.new(-58, 0, 12), Vector3.new(1, 0, 0), "SHOP", Color3.fromRGB(255, 110, 200), "Shop")
+	buildStand(folder, Vector3.new(58, 0, 12), Vector3.new(-1, 0, 0), "MAGIC", Color3.fromRGB(110, 190, 255), "Magic")
 
 	-- Welkomstbord boven de ingang
 	local welcome = deco({ Name = "Welcome", Size = Vector3.new(40, 6, 0.2), Position = Vector3.new(0, 20, HZ - 0.3), Transparency = 1, Parent = folder })
-	signText(welcome, Enum.NormalId.Front, "Kies een zaal!", Color3.fromRGB(255, 220, 120))
+	signText(welcome, Enum.NormalId.Front, "Choose a hall!", Color3.fromRGB(255, 220, 120))
 
 	local doors = {}
 	local count = #Config.Rooms
@@ -3905,7 +3905,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 			state = "Chase"
 			target = player
 			sawHide = false
-			Remotes.Notify:FireClient(player, "Ze heeft je gezien! RENNEN!", Color3.fromRGB(255, 40, 40))
+			Remotes.Notify:FireClient(player, "She saw you! RUN!", Color3.fromRGB(255, 40, 40))
 			if head then
 				Sounds.Play("Shush", head, 1)
 			end
@@ -4079,7 +4079,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 				humanoid:MoveTo(hrp.Position)
 			else
 				if now - lastSeen > M.LoseTargetTime then
-					Remotes.Notify:FireClient(player, "Ze is je kwijt... voor nu.", Color3.fromRGB(200, 200, 255))
+					Remotes.Notify:FireClient(player, "She lost you... for now.", Color3.fromRGB(200, 200, 255))
 					state = "Investigate"
 					target = nil
 					setGoal(lastKnown or hrp.Position)
@@ -4143,7 +4143,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		loopId += 1
 		local myId = loopId
 		for _, player in getPlayers() do
-			Remotes.Notify:FireClient(player, M.Name .. " is wakker geworden... wees STIL.", Color3.fromRGB(255, 60, 60))
+			Remotes.Notify:FireClient(player, M.Name .. " has woken up... stay QUIET.", Color3.fromRGB(255, 60, 60))
 		end
 		task.spawn(function()
 			while running and loopId == myId do
@@ -4285,9 +4285,9 @@ local function updateDoor(roomType: RoomType)
 		end
 	end
 	local queue = if roomType.QueueEnds
-		then string.format("⏳ Start over %ds · %d/%d in de ring", math.max(0, math.ceil(roomType.QueueEnds - os.clock())), #roomType.Waiting, Config.MaxGroupSize)
-		else "Stap samen in de ring!"
-	local groups = if busy > 0 then string.format("   🎮 %d groep%s (%d spelers) bezig", busy, if busy == 1 then "" else "en", playing) else ""
+		then string.format("⏳ Starting in %ds · %d/%d in the ring", math.max(0, math.ceil(roomType.QueueEnds - os.clock())), #roomType.Waiting, Config.MaxGroupSize)
+		else "Step into the ring together!"
+	local groups = if busy > 0 then string.format("   🎮 %d group%s (%d players) playing", busy, if busy == 1 then "" else "s", playing) else ""
 	roomType.Door.Info.Text = queue .. groups
 end
 
@@ -4385,19 +4385,19 @@ local function playRound(room: Room)
 		end
 		room.TimeLeft = t
 		room.State:SetAttribute("TimeLeft", t)
-		setState(room, "Starting", "Klaar voor de start... " .. t)
+		setState(room, "Starting", "Get ready... " .. t)
 		task.wait(1)
 	end
 
 	local elapsed = 0
 	if not aborted then
 		room.Books:SpawnAll()
-		setState(room, "Playing", if room.Level > 0 then "⭐ Pro " .. room.Level .. " · Ruim samen alle kasten op!" else "Ruim samen alle kasten op!")
+		setState(room, "Playing", if room.Level > 0 then "⭐ Pro " .. room.Level .. " · Clean up every shelf together!" else "Clean up every shelf together!")
 		local count = #roomPlayers(room)
 		for _, player in roomPlayers(room) do
 			notify(
 				player,
-				if count > 1 then string.format("Jullie zijn met %d. Werk samen!", count) else "Zet alle boeken terug in de juiste kast!",
+				if count > 1 then string.format("There are %d of you. Work together!", count) else "Put every book back on the right shelf!",
 				Color3.fromRGB(255, 220, 150)
 			)
 		end
@@ -4438,11 +4438,11 @@ local function playRound(room: Room)
 
 	room.State:SetAttribute("Results", results(room))
 	if room.Finished then
-		setState(room, "Won", "DE ZAAL IS SCHOON! Tijd: " .. formatTime(elapsed))
+		setState(room, "Won", "THE HALL IS CLEAN! Time: " .. formatTime(elapsed))
 		local reward = math.floor(Config.CoinsForWin * room.CoinMultiplier)
 		for _, player in roomPlayers(room) do
 			DataService.AddCoins(player, reward)
-			notify(player, "+" .. reward .. " munten!", Color3.fromRGB(255, 215, 0))
+			notify(player, "+" .. reward .. " coins!", Color3.fromRGB(255, 215, 0))
 			local profile = DataService.Get(player)
 			if profile then
 				profile.Wins += 1
@@ -4452,7 +4452,7 @@ local function playRound(room: Room)
 				if nextLevel > unlocked then
 					profile.Ascend[info.Id] = nextLevel
 					KeyService.Refresh(player)
-					notify(player, string.format("⭐ Pro %d van de %s is vrijgespeeld!", nextLevel, info.Name), Color3.fromRGB(255, 215, 0))
+					notify(player, string.format("⭐ Pro %d of the %s unlocked!", nextLevel, info.Name), Color3.fromRGB(255, 215, 0))
 				end
 				if not profile.BestTime or elapsed < profile.BestTime then
 					profile.BestTime = elapsed
@@ -4460,7 +4460,7 @@ local function playRound(room: Room)
 			end
 		end
 	else
-		setState(room, "Lost", "De tijd is op... " .. room.Books.Placed .. "/" .. room.Books.Total .. " boeken")
+		setState(room, "Lost", "Time is up... " .. room.Books.Placed .. "/" .. room.Books.Total .. " books")
 	end
 	task.wait(Config.EndScreenTime)
 	for _, player in roomPlayers(room) do
@@ -4621,7 +4621,7 @@ local function sendGroup(roomType: RoomType, group: { Player }, level: number?):
 	end
 	if not room then
 		for _, player in group do
-			notify(player, "Alle " .. roomType.Info.Name .. "s zijn bezet. Nog even wachten...", Color3.fromRGB(255, 200, 120))
+			notify(player, "All " .. roomType.Info.Name .. "s are busy. Please wait a moment...", Color3.fromRGB(255, 200, 120))
 		end
 		return false
 	end
@@ -4633,7 +4633,7 @@ local function sendGroup(roomType: RoomType, group: { Player }, level: number?):
 		table.insert(names, player.DisplayName)
 	end
 	for _, player in group do
-		notify(player, "Welkom in de " .. roomType.Info.Name .. "! " .. (if #group > 1 then "Team: " .. table.concat(names, ", ") else ""), roomType.Info.Color)
+		notify(player, "Welcome to the " .. roomType.Info.Name .. "! " .. (if #group > 1 then "Team: " .. table.concat(names, ", ") else ""), roomType.Info.Color)
 	end
 	if not room.RoundRunning then
 		task.spawn(runRound, room)
@@ -4663,7 +4663,7 @@ function RoomService.PlayNow(player: Player, typeId: string, level: number?)
 	local profile = DataService.Get(player)
 	local unlocked = if profile then profile.Ascend[typeId] or 0 else 0
 	if wanted > unlocked then
-		notify(player, "Win eerst de " .. roomType.Info.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+		notify(player, "Win the " .. roomType.Info.Name .. " first to unlock Pro Mode!", Color3.fromRGB(255, 200, 120))
 		return
 	end
 	sendGroup(roomType, { player }, math.clamp(wanted, 0, Config.Pro.MaxLevel))
@@ -4685,7 +4685,7 @@ local function queueLoop()
 			elseif not roomType.QueueEnds then
 				roomType.QueueEnds = os.clock() + Config.QueueTime
 				for _, player in waiting do
-					notify(player, "Wacht even op je vrienden... iedereen in de ring gaat samen naar binnen!", roomType.Info.Color)
+					notify(player, "Waiting for your friends... everyone in the ring enters together!", roomType.Info.Color)
 				end
 			elseif os.clock() >= roomType.QueueEnds then
 				if launch(roomType) then
@@ -4837,45 +4837,45 @@ local function buy(player: Player, kind: string, id: string)
 		end
 		local level = profile.Upgrades[id] or 0
 		if level >= item.MaxLevel then
-			notify(player, item.Name .. " is al op het hoogste niveau.", BAD)
+			notify(player, item.Name .. " is already at the highest level.", BAD)
 			return
 		end
 		local cost = Config.ShopCost(item, level)
 		if not DataService.SpendCoins(player, cost) then
-			notify(player, "Niet genoeg munten! Je hebt er " .. cost .. " nodig.", BAD)
+			notify(player, "Not enough coins! You need " .. cost .. ".", BAD)
 			return
 		end
 		profile.Upgrades[id] = level + 1
-		notify(player, string.format("%s %s gekocht! (niveau %d)", item.Icon, item.Name, level + 1), GOOD)
+		notify(player, string.format("%s %s bought! (level %d)", item.Icon, item.Name, level + 1), GOOD)
 	elseif kind == "Magic" then
 		local info = Config.FindMagic(id)
 		if not info then
 			return
 		end
 		if profile.Magic[id] then
-			notify(player, "Die magie heb je al.", BAD)
+			notify(player, "You already have that magic.", BAD)
 			return
 		end
 		if not DataService.SpendCoins(player, info.Cost) then
-			notify(player, "Niet genoeg munten! Je hebt er " .. info.Cost .. " nodig.", BAD)
+			notify(player, "Not enough coins! You need " .. info.Cost .. ".", BAD)
 			return
 		end
 		profile.Magic[id] = true
 		local slot = table.find(Config.Magic, info) or 0
-		notify(player, string.format("%s %s ontgrendeld! Druk op %d.", info.Icon, info.Name, slot), GOOD)
+		notify(player, string.format("%s %s unlocked! Press %d.", info.Icon, info.Name, slot), GOOD)
 	elseif kind == "Assistant" then
 		local nextLevel = profile.Assistant + 1
 		local levelInfo = Config.Assistant.Levels[nextLevel]
 		if not levelInfo then
-			notify(player, Config.Assistant.Name .. " is al op het hoogste niveau.", BAD)
+			notify(player, Config.Assistant.Name .. " is already at the highest level.", BAD)
 			return
 		end
 		if not DataService.SpendCoins(player, levelInfo.Cost) then
-			notify(player, "Niet genoeg munten! Je hebt er " .. levelInfo.Cost .. " nodig.", BAD)
+			notify(player, "Not enough coins! You need " .. levelInfo.Cost .. ".", BAD)
 			return
 		end
 		profile.Assistant = nextLevel
-		notify(player, string.format("🦉 %s helpt je nu (niveau %d)!", Config.Assistant.Name, nextLevel), GOOD)
+		notify(player, string.format("🦉 %s is helping you now (level %d)!", Config.Assistant.Name, nextLevel), GOOD)
 	else
 		return
 	end
@@ -4906,14 +4906,14 @@ local function useAbility(player: Player, id: string)
 			mine[id] = now + info.Cooldown
 			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
 		end
-		notify(player, if got > 0 then string.format("🧲 %d boek%s verzameld!", got, if got == 1 then "" else "en") else "🧲 Geen boeken in de buurt (of je handen zijn vol).", Color3.fromRGB(150, 210, 255))
+		notify(player, if got > 0 then string.format("🧲 %d book%s gathered!", got, if got == 1 then "" else "s") else "🧲 No books nearby (or your hands are full).", Color3.fromRGB(150, 210, 255))
 	elseif id == "AutoShelf" then
 		local placed = if books then books:AutoShelf(player) else 0
 		if placed > 0 then
 			mine[id] = now + info.Cooldown
 			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
 		end
-		notify(player, if placed > 0 then string.format("✨ %d boek%s vliegen naar hun kast!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
+		notify(player, if placed > 0 then string.format("✨ %d book%s flying to their shelves!", placed, if placed == 1 then "" else "s") else "✨ You are not carrying any books.", Color3.fromRGB(255, 230, 140))
 	end
 end
 
@@ -5047,7 +5047,7 @@ local function insight(): boolean
 	local room = roomModel()
 	local books = room and room:FindFirstChild("Books")
 	if not root or not books then
-		Hud.Notify("Ga eerst een zaal in.", Color3.fromRGB(220, 220, 220))
+		Hud.Notify("Enter a hall first.", Color3.fromRGB(220, 220, 220))
 		return false
 	end
 	local markers = {}
@@ -5078,7 +5078,7 @@ local function insight(): boolean
 			table.insert(markers, bb)
 		end
 	end
-	Hud.Notify(string.format("👁 Inzicht: %d boeken in de buurt", found), Color3.fromRGB(255, 225, 120))
+	Hud.Notify(string.format("👁 Insight: %d books nearby", found), Color3.fromRGB(255, 225, 120))
 	task.delay(Config.InsightDuration, function()
 		for _, bb in markers do
 			bb:Destroy()
@@ -5091,7 +5091,7 @@ end
 local function shelfGuide(): boolean
 	local book = Controls.Inventory[1]
 	if not book then
-		Hud.Notify("Pak eerst een boek op.", Color3.fromRGB(220, 220, 220))
+		Hud.Notify("Pick up a book first.", Color3.fromRGB(220, 220, 220))
 		return false
 	end
 	local root = getRoot()
@@ -5137,7 +5137,7 @@ local function shelfGuide(): boolean
 	label.Parent = bb
 	bb.Parent = player:WaitForChild("PlayerGui")
 
-	Hud.Notify("🧭 Volg het licht naar " .. book.Code, color)
+	Hud.Notify("🧭 Follow the light to " .. book.Code, color)
 	task.delay(Config.ShelfGuideDuration, function()
 		beam:Destroy()
 		a0:Destroy()
@@ -5153,17 +5153,17 @@ local function useAbility(id: string)
 		return
 	end
 	if not player:GetAttribute("Magic_" .. id) then
-		Hud.Notify(string.format("🔒 %s is nog op slot. Koop het bij Magie (C).", info.Name), Color3.fromRGB(255, 200, 120))
+		Hud.Notify(string.format("🔒 %s is still locked. Buy it in Magic (C).", info.Name), Color3.fromRGB(255, 200, 120))
 		return
 	end
 	local now = os.clock()
 	local wait = (cooldownUntil[id] or 0) - now
 	if wait > 0 then
-		Hud.Notify(string.format("⏳ %s: nog %d s wachten", info.Name, math.ceil(wait)), Color3.fromRGB(200, 200, 220))
+		Hud.Notify(string.format("⏳ %s: wait %d more seconds", info.Name, math.ceil(wait)), Color3.fromRGB(200, 200, 220))
 		return
 	end
 	if not roomModel() then
-		Hud.Notify("Magie werkt alleen in een zaal. Kies eerst een zaal!", Color3.fromRGB(220, 220, 220))
+		Hud.Notify("Magic only works inside a hall. Choose a hall first!", Color3.fromRGB(220, 220, 220))
 		return
 	end
 	local used = true
@@ -5174,7 +5174,7 @@ local function useAbility(id: string)
 	elseif id == "AutoShelf" then
 		-- Zonder boeken in je handen heeft het geen zin (en verspil je de afkoeltijd niet)
 		if #Controls.Inventory == 0 then
-			Hud.Notify("✨ Pak eerst boeken op, dan vliegen ze vanzelf naar hun kast.", Color3.fromRGB(255, 230, 140))
+			Hud.Notify("✨ Pick up some books first, then they will fly to their shelves.", Color3.fromRGB(255, 230, 140))
 			return
 		end
 		Remotes.Action:FireServer("Ability", id)
@@ -5836,7 +5836,7 @@ local function onRefresh(name: string, fn: () -> ())
 end
 
 local function buildShopPanel()
-	local list = buildPanel("Shop", "Winkel", CRIMSON_EDGE)
+	local list = buildPanel("Shop", "Shop", CRIMSON_EDGE)
 	local rows = {}
 	for i, item in Config.Shop do
 		local row = buildRow(list, i, item.Icon, item.Name, item.Description)
@@ -5849,7 +5849,7 @@ local function buildShopPanel()
 		for _, item in Config.Shop do
 			local row = rows[item.Id]
 			local level = player:GetAttribute("Up_" .. item.Id) or 0
-			row.Info.Text = string.format("%s  •  niveau %d/%d", item.Description, level, item.MaxLevel)
+			row.Info.Text = string.format("%s  •  level %d/%d", item.Description, level, item.MaxLevel)
 			if level >= item.MaxLevel then
 				setBuyButton(row.Button, "MAX", false, false)
 			else
@@ -5861,7 +5861,7 @@ local function buildShopPanel()
 end
 
 local function buildMagicPanel()
-	local list = buildPanel("Magic", "Magie", NAVY_EDGE)
+	local list = buildPanel("Magic", "Magic", NAVY_EDGE)
 	local rows = {}
 	for i, info in Config.Magic do
 		local row = buildRow(list, i, info.Icon, string.format("%d · %s", i, info.Name), info.Description)
@@ -5879,7 +5879,7 @@ local function buildMagicPanel()
 		TextSize = 26,
 		TextColor3 = GOLD,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = "🔑 Sleutels (elke ronde opnieuw zoeken)",
+		Text = "🔑 Keys (find them again every round)",
 		ZIndex = 32,
 		Parent = list,
 	})
@@ -5894,8 +5894,8 @@ local function buildMagicPanel()
 		for _, info in Config.Magic do
 			local row = rows[info.Id]
 			if player:GetAttribute("Magic_" .. info.Id) then
-				setBuyButton(row.Button, "✔ Ontgrendeld", false, true)
-				row.Info.Text = string.format("%s  •  afkoeltijd %ds", info.Description, info.Cooldown)
+				setBuyButton(row.Button, "✔ Unlocked", false, true)
+				row.Info.Text = string.format("%s  •  cooldown %ds", info.Description, info.Cooldown)
 			else
 				setBuyButton(row.Button, "🪙 " .. info.Cost, true, coins() >= info.Cost)
 			end
@@ -5903,14 +5903,14 @@ local function buildMagicPanel()
 		for _, info in Config.Keys do
 			local row = keyRows[info.Id]
 			local has = player:GetAttribute("Key_" .. info.Id) == true
-			row.Button.Text = if has then "✔ Gevonden" else "❓ Zoek!"
+			row.Button.Text = if has then "✔ Found" else "❓ Search!"
 			row.Button.BackgroundColor3 = if has then info.Color else Color3.fromRGB(70, 76, 96)
 		end
 	end)
 end
 
 local function buildAssistantPanel()
-	local list = buildPanel("Assistant", "Assistent", NAVY_EDGE)
+	local list = buildPanel("Assistant", "Assistant", NAVY_EDGE)
 	local row = buildRow(list, 1, "🦉", Config.Assistant.Name, "")
 	row.Button.Activated:Connect(function()
 		Remotes.Action:FireServer("Buy", "Assistant", "Owl")
@@ -5925,8 +5925,8 @@ local function buildAssistantPanel()
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = Color3.fromRGB(210, 215, 235),
-		Text = "Je magische uil laat af en toe een boek naar de goede kast zweven. "
-			.. "Hoe hoger het niveau, hoe vaker hij helpt. De boeken die hij terugzet tellen voor jou en leveren munten op.",
+		Text = "Your magic owl now and then floats a book to the right shelf. "
+			.. "The higher its level, the more often it helps. Books it puts back count for you and earn coins.",
 		ZIndex = 32,
 		Parent = list,
 	})
@@ -5935,10 +5935,10 @@ local function buildAssistantPanel()
 		local current = Config.Assistant.Levels[level]
 		local nextInfo = Config.Assistant.Levels[level + 1]
 		row.Info.Text = if current
-			then string.format("Niveau %d: zet elke %d seconden een boek terug", level, current.Interval)
-			else "Nog geen assistent"
+			then string.format("Level %d: puts back a book every %d seconds", level, current.Interval)
+			else "No assistant yet"
 		if nextInfo then
-			local label = if level == 0 then "Koop" else "Niv. " .. (level + 1)
+			local label = if level == 0 then "Buy" else "Lvl " .. (level + 1)
 			setBuyButton(row.Button, label .. " 🪙" .. nextInfo.Cost, true, coins() >= nextInfo.Cost)
 		else
 			setBuyButton(row.Button, "MAX", false, false)
@@ -5947,11 +5947,11 @@ local function buildAssistantPanel()
 end
 
 local function buildSettingsPanel()
-	local list = buildPanel("Settings", "Instellingen", NAVY_EDGE)
+	local list = buildPanel("Settings", "Settings", NAVY_EDGE)
 	local options = {
-		{ "Music", "🎵", "Muziek", "Muziek en hartslag aan of uit" },
-		{ "Shake", "📳", "Schermschudden", "Het beeld trilt als het monster dichtbij is" },
-		{ "Danger", "🟥", "Gevarenrand", "Rode rand als het monster dichtbij is" },
+		{ "Music", "🎵", "Music", "Music and heartbeat on or off" },
+		{ "Shake", "📳", "Screen shake", "The screen shakes when the monster is close" },
+		{ "Danger", "🟥", "Danger border", "Red border when the monster is close" },
 	}
 	local rows = {}
 	for i, option in options do
@@ -5974,20 +5974,20 @@ local function buildSettingsPanel()
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = Color3.fromRGB(210, 215, 235),
-		Text = "Besturing\n"
-			.. "E  boek oppakken / terugzetten / verstoppen\n"
-			.. "1-4  magie gebruiken (eerst kopen bij Magie)\n"
-			.. "Shift  sprinten (maakt lawaai!)\n"
-			.. "G  boeken laten vallen\n"
-			.. "F Winkel  •  C Magie  •  M Assistent  •  Z Instellingen\n\n"
-			.. "Lees de code op elk boek (bijv. 1H) en breng het naar de kast met hetzelfde groene bordje.",
+		Text = "Controls\n"
+			.. "E  pick up / shelve books / hide\n"
+			.. "1-4  use magic (buy it in Magic first)\n"
+			.. "Shift  sprint (makes noise!)\n"
+			.. "G  drop your books\n"
+			.. "F Shop  •  C Magic  •  M Assistant  •  Z Settings\n\n"
+			.. "Read the code on each book (e.g. 1H) and bring it to the shelf with the same green sign.",
 		ZIndex = 32,
 		Parent = list,
 	})
 	onRefresh("Settings", function()
 		for key, row in rows do
 			local on = (Hud.Settings :: any)[key] == true
-			setBuyButton(row.Button, if on then "AAN" else "UIT", true, on)
+			setBuyButton(row.Button, if on then "ON" else "OFF", true, on)
 		end
 	end)
 end
@@ -6011,14 +6011,14 @@ local function buildMenu()
 		Size = UDim2.new(1, 0, 0, 26),
 		Font = Enum.Font.Fantasy,
 		TextSize = 22,
-		Text = "Ruim alle kasten op",
+		Text = "Clean up every shelf",
 		Parent = holder,
 	})
 	local items = {
-		{ "Shop", "Winkel", "F", true },
-		{ "Magic", "Magie", "C", false },
-		{ "Assistant", "Assistent", "M", false },
-		{ "Settings", "Instellingen", "Z", false },
+		{ "Shop", "Shop", "F", true },
+		{ "Magic", "Magic", "C", false },
+		{ "Assistant", "Assistant", "M", false },
+		{ "Settings", "Settings", "Z", false },
 	}
 	for i, item in items do
 		local name, label, key, red = item[1], item[2], item[3], item[4]
@@ -6308,7 +6308,7 @@ local function buildRoomChooser()
 		Size = UDim2.new(1, 0, 0, 50),
 		Font = SERIF,
 		TextSize = 46,
-		Text = "📖 Kies een zaal",
+		Text = "📖 Choose a hall",
 		ZIndex = 26,
 		Parent = chooser,
 	})
@@ -6368,7 +6368,7 @@ local function buildRoomChooser()
 			TextWrapped = true,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextColor3 = Color3.fromRGB(215, 220, 240),
-			Text = string.format("%s\n\n⏱ %d minuten\n📚 %d boeken\n🪙 %s× munten", room.Description, minutes, Config.RoomTotalBooks(room), tostring(room.CoinMultiplier)),
+			Text = string.format("%s\n\n⏱ %d minutes\n📚 %d books\n🪙 %s× coins", room.Description, minutes, Config.RoomTotalBooks(room), tostring(room.CoinMultiplier)),
 			ZIndex = 27,
 			Parent = card,
 		})
@@ -6380,7 +6380,7 @@ local function buildRoomChooser()
 			Font = ROUND,
 			TextSize = 24,
 			TextColor3 = WHITE,
-			Text = "▶ Spelen",
+			Text = "▶ Play",
 			ZIndex = 27,
 			Parent = card,
 		})
@@ -6412,7 +6412,7 @@ local function buildRoomChooser()
 				pro.Text = "⭐ Pro " .. level
 				pro.BackgroundColor3 = Color3.fromRGB(190, 130, 30)
 			else
-				pro.Text = "🔒 Pro: win eerst"
+				pro.Text = "🔒 Pro: win first"
 				pro.BackgroundColor3 = Color3.fromRGB(70, 76, 96)
 			end
 		end
@@ -6421,7 +6421,7 @@ local function buildRoomChooser()
 		pro.Activated:Connect(function()
 			local level = player:GetAttribute("Ascend_" .. room.Id) or 0
 			if level <= 0 then
-				Hud.Notify("Win eerst de " .. room.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+				Hud.Notify("Win the " .. room.Name .. " first to unlock Pro Mode!", Color3.fromRGB(255, 200, 120))
 				return
 			end
 			chooser.Visible = false
@@ -6437,7 +6437,7 @@ local function buildRoomChooser()
 		TextSize = 15,
 		TextWrapped = true,
 		TextColor3 = Color3.fromRGB(200, 205, 230),
-		Text = "Met vrienden spelen? Sluit dit menu en stap samen in de ring voor een deur. Speelt een vriend al? Dan kom je bij hem of haar.",
+		Text = "Playing with friends? Close this menu and step into the ring in front of a door together. Is a friend already playing? Then you will join them.",
 		ZIndex = 26,
 		Parent = chooser,
 	})
@@ -6453,7 +6453,7 @@ local function buildLeaveButton()
 		Font = SERIF,
 		TextSize = 26,
 		TextColor3 = WHITE,
-		Text = "🚪 Terug naar de hal",
+		Text = "🚪 Back to the lobby",
 		Visible = false,
 		Parent = gui,
 	})
@@ -6472,7 +6472,7 @@ local function buildLeaveButton()
 		Font = SERIF,
 		TextSize = 26,
 		TextColor3 = WHITE,
-		Text = "📖 Kies een zaal",
+		Text = "📖 Choose a hall",
 		Visible = false,
 		Parent = gui,
 	})
@@ -6561,7 +6561,7 @@ local function buildOverlays()
 		Size = UDim2.fromOffset(500, 30),
 		Font = SERIF,
 		TextSize = 26,
-		Text = "Je zit verstopt... houd E ingedrukt om eruit te gaan",
+		Text = "You are hiding... hold E to come out",
 		ZIndex = 6,
 		Parent = hiddenOverlay,
 	})
@@ -6639,7 +6639,7 @@ function Hud.SetInventory(list: { any }, capacity: number)
 			Font = Enum.Font.GothamBold,
 			TextSize = 14,
 			TextColor3 = WHITE,
-			Text = string.format("%s  %s%s", book.Code, if section then section.Name else "", if book.Volume then " · deel " .. book.Volume else ""),
+			Text = string.format("%s  %s%s", book.Code, if section then section.Name else "", if book.Volume then " · vol. " .. book.Volume else ""),
 			Parent = chip,
 		})
 	end
@@ -6819,7 +6819,7 @@ local function updateRound()
 			chooser.Visible = true
 		end
 		wasInRoom = false
-		objectiveLabel.Text = "Kies een zaal!"
+		objectiveLabel.Text = "Choose a hall!"
 		return
 	end
 	timerLabel.Visible = true
@@ -6847,10 +6847,10 @@ local function updateRound()
 
 	if state == "Playing" then
 		local left = total - placed
-		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
-		objectiveLabel.Text = proText .. (if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op")
+		sectionsLeftLabel.Text = string.format("%d book%s to go", left, if left == 1 then "" else "s")
+		objectiveLabel.Text = proText .. (if playerCount > 1 then string.format("Cleaning together · 👥 %d", playerCount) else "Clean up every shelf")
 	elseif state == "Starting" then
-		sectionsLeftLabel.Text = "de zaal gaat zo open..."
+		sectionsLeftLabel.Text = "the hall opens soon..."
 		objectiveLabel.Text = message
 	else
 		sectionsLeftLabel.Text = ""

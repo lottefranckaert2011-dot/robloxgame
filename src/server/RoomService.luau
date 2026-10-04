@@ -109,9 +109,9 @@ local function updateDoor(roomType: RoomType)
 		end
 	end
 	local queue = if roomType.QueueEnds
-		then string.format("⏳ Start over %ds · %d/%d in de ring", math.max(0, math.ceil(roomType.QueueEnds - os.clock())), #roomType.Waiting, Config.MaxGroupSize)
-		else "Stap samen in de ring!"
-	local groups = if busy > 0 then string.format("   🎮 %d groep%s (%d spelers) bezig", busy, if busy == 1 then "" else "en", playing) else ""
+		then string.format("⏳ Starting in %ds · %d/%d in the ring", math.max(0, math.ceil(roomType.QueueEnds - os.clock())), #roomType.Waiting, Config.MaxGroupSize)
+		else "Step into the ring together!"
+	local groups = if busy > 0 then string.format("   🎮 %d group%s (%d players) playing", busy, if busy == 1 then "" else "s", playing) else ""
 	roomType.Door.Info.Text = queue .. groups
 end
 
@@ -209,19 +209,19 @@ local function playRound(room: Room)
 		end
 		room.TimeLeft = t
 		room.State:SetAttribute("TimeLeft", t)
-		setState(room, "Starting", "Klaar voor de start... " .. t)
+		setState(room, "Starting", "Get ready... " .. t)
 		task.wait(1)
 	end
 
 	local elapsed = 0
 	if not aborted then
 		room.Books:SpawnAll()
-		setState(room, "Playing", if room.Level > 0 then "⭐ Pro " .. room.Level .. " · Ruim samen alle kasten op!" else "Ruim samen alle kasten op!")
+		setState(room, "Playing", if room.Level > 0 then "⭐ Pro " .. room.Level .. " · Clean up every shelf together!" else "Clean up every shelf together!")
 		local count = #roomPlayers(room)
 		for _, player in roomPlayers(room) do
 			notify(
 				player,
-				if count > 1 then string.format("Jullie zijn met %d. Werk samen!", count) else "Zet alle boeken terug in de juiste kast!",
+				if count > 1 then string.format("There are %d of you. Work together!", count) else "Put every book back on the right shelf!",
 				Color3.fromRGB(255, 220, 150)
 			)
 		end
@@ -262,11 +262,11 @@ local function playRound(room: Room)
 
 	room.State:SetAttribute("Results", results(room))
 	if room.Finished then
-		setState(room, "Won", "DE ZAAL IS SCHOON! Tijd: " .. formatTime(elapsed))
+		setState(room, "Won", "THE HALL IS CLEAN! Time: " .. formatTime(elapsed))
 		local reward = math.floor(Config.CoinsForWin * room.CoinMultiplier)
 		for _, player in roomPlayers(room) do
 			DataService.AddCoins(player, reward)
-			notify(player, "+" .. reward .. " munten!", Color3.fromRGB(255, 215, 0))
+			notify(player, "+" .. reward .. " coins!", Color3.fromRGB(255, 215, 0))
 			local profile = DataService.Get(player)
 			if profile then
 				profile.Wins += 1
@@ -276,7 +276,7 @@ local function playRound(room: Room)
 				if nextLevel > unlocked then
 					profile.Ascend[info.Id] = nextLevel
 					KeyService.Refresh(player)
-					notify(player, string.format("⭐ Pro %d van de %s is vrijgespeeld!", nextLevel, info.Name), Color3.fromRGB(255, 215, 0))
+					notify(player, string.format("⭐ Pro %d of the %s unlocked!", nextLevel, info.Name), Color3.fromRGB(255, 215, 0))
 				end
 				if not profile.BestTime or elapsed < profile.BestTime then
 					profile.BestTime = elapsed
@@ -284,7 +284,7 @@ local function playRound(room: Room)
 			end
 		end
 	else
-		setState(room, "Lost", "De tijd is op... " .. room.Books.Placed .. "/" .. room.Books.Total .. " boeken")
+		setState(room, "Lost", "Time is up... " .. room.Books.Placed .. "/" .. room.Books.Total .. " books")
 	end
 	task.wait(Config.EndScreenTime)
 	for _, player in roomPlayers(room) do
@@ -445,7 +445,7 @@ local function sendGroup(roomType: RoomType, group: { Player }, level: number?):
 	end
 	if not room then
 		for _, player in group do
-			notify(player, "Alle " .. roomType.Info.Name .. "s zijn bezet. Nog even wachten...", Color3.fromRGB(255, 200, 120))
+			notify(player, "All " .. roomType.Info.Name .. "s are busy. Please wait a moment...", Color3.fromRGB(255, 200, 120))
 		end
 		return false
 	end
@@ -457,7 +457,7 @@ local function sendGroup(roomType: RoomType, group: { Player }, level: number?):
 		table.insert(names, player.DisplayName)
 	end
 	for _, player in group do
-		notify(player, "Welkom in de " .. roomType.Info.Name .. "! " .. (if #group > 1 then "Team: " .. table.concat(names, ", ") else ""), roomType.Info.Color)
+		notify(player, "Welcome to the " .. roomType.Info.Name .. "! " .. (if #group > 1 then "Team: " .. table.concat(names, ", ") else ""), roomType.Info.Color)
 	end
 	if not room.RoundRunning then
 		task.spawn(runRound, room)
@@ -487,7 +487,7 @@ function RoomService.PlayNow(player: Player, typeId: string, level: number?)
 	local profile = DataService.Get(player)
 	local unlocked = if profile then profile.Ascend[typeId] or 0 else 0
 	if wanted > unlocked then
-		notify(player, "Win eerst de " .. roomType.Info.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+		notify(player, "Win the " .. roomType.Info.Name .. " first to unlock Pro Mode!", Color3.fromRGB(255, 200, 120))
 		return
 	end
 	sendGroup(roomType, { player }, math.clamp(wanted, 0, Config.Pro.MaxLevel))
@@ -509,7 +509,7 @@ local function queueLoop()
 			elseif not roomType.QueueEnds then
 				roomType.QueueEnds = os.clock() + Config.QueueTime
 				for _, player in waiting do
-					notify(player, "Wacht even op je vrienden... iedereen in de ring gaat samen naar binnen!", roomType.Info.Color)
+					notify(player, "Waiting for your friends... everyone in the ring enters together!", roomType.Info.Color)
 				end
 			elseif os.clock() >= roomType.QueueEnds then
 				if launch(roomType) then

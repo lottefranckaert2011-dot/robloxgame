@@ -1,10 +1,11 @@
 # Clean The Library 📖 [Nightmare]
 
 Een namaak van het Roblox-spel **Clean The Library** (van de groep *Retro Library*), in een **Nightmare**-versie met een monster.
+Alle tekst in het spel is in het **Engels**; deze uitleg is in het Nederlands.
 Het origineel speel je hier: <https://www.roblox.com/games/109881277752094/Clean-The-Library>.
 
 De prachtige bibliotheek is één grote rommel: overal liggen boeken op de grond. Zet ze allemaal terug in de juiste kast
-voordat de tijd op is. Maar **wees stil**: *De Bibliothecaresse* sluipt door de gangen…
+voordat de tijd op is. Maar **wees stil**: *The Librarian* sluipt door de gangen…
 
 ## Snel spelen
 
@@ -34,32 +35,32 @@ Zo werkt samen spelen in het spel:
 ## De hal en de zalen
 
 Je begint in de **hal**: een grote ruimte met boogramen, een paars gewelf met een kroonluchter en een reuzenboek op de vloer.
-Zodra je in de hal bent, verschijnt het menu **📖 Kies een zaal**. Klik bij een zaal op **▶ Spelen** en je gaat meteen naar binnen.
+Zodra je in de hal bent, verschijnt het menu **📖 Choose a hall**. Klik bij een zaal op **▶ Play** en je gaat meteen naar binnen.
 Het menu krijg je terug met de knop rechtsboven.
 Wil je met vrienden samen in één groep? Sluit het menu en stap samen in de gloeiende ring voor een van de drie deuren achterin.
 
 | Zaal | Wat je krijgt |
 | --- | --- |
-| 🟢 **Starterzaal** | 1 verdieping, 12 kasten (72 boeken), 12 minuten, geen monster |
-| 🔵 **Grote Zaal** | 2 verdiepingen, 31 kasten (248 boeken), 20 minuten, De Bibliothecaresse, 1,5× munten |
-| 🔴 **Nachtmerriezaal** | Pikdonker (je krijgt een zaklamp), een sneller monster, 2× munten |
+| 🟢 **Starter Hall** | 1 verdieping, 12 kasten (72 boeken), 12 minuten, geen monster |
+| 🔵 **Grand Hall** | 2 verdiepingen, 31 kasten (248 boeken), 20 minuten, The Librarian, 1,5× munten |
+| 🔴 **Nightmare Hall** | Pikdonker (je krijgt een zaklamp), een sneller monster, 2× munten |
 
 Boven elke deur zie je de aftelling van de ring en hoeveel groepen er al bezig zijn.
-Na afloop (of via de voordeur van de zaal, of de knop **🚪 Terug naar de hal**) ga je terug naar de hal.
-In de hal staan ook kramen voor de **Winkel** en **Magie**.
+Na afloop (of via de voordeur van de zaal, of de knop **🚪 Back to the lobby**) ga je terug naar de hal.
+In de hal staan ook kramen voor de **Shop** en **Magic**.
 
 ## Hoe speel je
 
 | Toets | Wat het doet |
 | --- | --- |
 | **E** | Boek oppakken / boeken in de kast terugzetten / verstoppen in een kast |
-| **1 – 4** | Magie gebruiken (eerst kopen in het Magie-menu) |
+| **1 – 4** | Magie gebruiken (eerst kopen in het Magic-menu) |
 | **Shift** | Sprinten. Pas op: sprinten maakt lawaai! |
 | **G** | Laat de boeken die je draagt vallen |
-| **F** | Winkel |
-| **C** | Magie |
-| **M** | Assistent |
-| **Z** | Instellingen |
+| **F** | Shop |
+| **C** | Magic |
+| **M** | Assistant |
+| **Z** | Settings |
 
 Op een telefoon of tablet tik je gewoon op de knoppen in beeld.
 
@@ -71,7 +72,7 @@ Op een telefoon of tablet tik je gewoon op de knoppen in beeld.
 
 ### Boekenseries
 
-In elke kast hoort een **serie van 3 delen** (bijv. *De Horror-reeks · Deel 1, 2 en 3*). Je herkent ze aan de brede
+In elke kast hoort een **serie van 3 delen** (bijv. *The Horror Saga · Vol. 1, 2 and 3*). Je herkent ze aan de brede
 gouden band en de gouden code met I, II of III op de rug. Ze moeten **op volgorde** terug: deel 2 pas als deel 1 staat,
 en deel 3 als laatste. De lege plekken voor de serie zijn goudkleurig en hebben een nummer. Draag je deel 1 en 2 tegelijk,
 dan zet je ze in één keer terug.
@@ -79,23 +80,23 @@ dan zet je ze in één keer terug.
 ### Pro Mode (Ascend)
 
 Win je een zaal, dan speel je **⭐ Pro 1** van die zaal vrij. Win je Pro 1, dan gaat Pro 2 open, en zo verder tot Pro 5.
-Kies Pro in het keuzemenu met de gouden knop onder **▶ Spelen**. Elk Pro-niveau geeft:
+Kies Pro in het keuzemenu met de gouden knop onder **▶ Play**. Elk Pro-niveau geeft:
 
 - 12% minder tijd;
-- een 8% sneller monster (ook in de Starterzaal komt De Bibliothecaresse dan tevoorschijn);
+- een 8% sneller monster (ook in de Starter Hall komt The Librarian dan tevoorschijn);
 - 50% meer munten.
 
 ### Munten uitgeven
 
-- **Winkel (F)**: *Grotere Tas* (meer boeken dragen) en *Snelle Schoenen* (sneller lopen).
-- **Magie (C)**: vier vaardigheden voor de vakjes 1–4. 👁 *Inzicht* laat boeken in de buurt oplichten,
-  🧭 *Kastgids* wijst met een lichtstraal de goede kast aan, 🧲 *Verzamelen* trekt de dichtstbijzijnde boeken naar je toe
-  en ✨ *Auto-plaatsen* laat al je boeken vanzelf naar de goede kast vliegen.
-- **Assistent (M)**: *Uil Oehoe* laat af en toe een boek naar de goede kast zweven.
+- **Shop (F)**: *Bigger Bag* (meer boeken dragen) en *Fast Shoes* (sneller lopen).
+- **Magic (C)**: vier vaardigheden voor de vakjes 1–4. 👁 *Insight* laat boeken in de buurt oplichten,
+  🧭 *Shelf Guide* wijst met een lichtstraal de goede kast aan, 🧲 *Gather* trekt de dichtstbijzijnde boeken naar je toe
+  en ✨ *Auto-Shelve* laat al je boeken vanzelf naar de goede kast vliegen.
+- **Assistant (M)**: *Hoot the Owl* laat af en toe een boek naar de goede kast zweven.
 
 ### De Nightmare
 
-- In de Grote Zaal en de Nachtmerriezaal wordt na 20 seconden **De Bibliothecaresse** wakker. Ze loopt rond over beide verdiepingen,
+- In de Grand Hall en de Nightmare Hall wordt na 20 seconden **The Librarian** wakker. Ze loopt rond over beide verdiepingen,
   komt af op lawaai (sprinten, een boek in de verkeerde kast) en zit iedereen achterna die ze ziet.
 - Hoe meer boeken er terug staan, hoe sneller ze wordt.
 - Een rode, kloppende rand op je scherm betekent dat ze dichtbij is.
@@ -109,10 +110,10 @@ Hun upgrade geldt alleen voor die ronde. In de volgende ronde moet je ze dus opn
 
 | Sleutel | Upgrade |
 | --- | --- |
-| Karmijnrode Achthoek | Je springt veel hoger |
-| Gouden Diamant | +3 boeken dragen |
-| Azuurblauwe Ster | +3 boeken dragen |
-| Smaragdgroene Klaver | Je sprint veel sneller |
+| Crimson Octagon | Je springt veel hoger |
+| Golden Diamond | +3 boeken dragen |
+| Azure Star | +3 boeken dragen |
+| Emerald Clover | Je sprint veel sneller |
 
 ## Muziek en geluid toevoegen
 
@@ -127,15 +128,15 @@ Alles wat leeg is (`""`), blijft stil. Zo vul je ze in:
 | Plek in `Config.Music` | Wanneer het speelt |
 | --- | --- |
 | `Lobby` | in de hal |
-| `Library` | in de Starterzaal en de Grote Zaal |
-| `Nightmare` | in de Nachtmerriezaal |
+| `Library` | in de Starter Hall en de Grand Hall |
+| `Nightmare` | in de Nightmare Hall |
 | `Chase` | als het monster dichtbij is |
 | `Countdown` | in de laatste minuut van een ronde |
 | `Win` / `Lose` | als de zaal schoon is / als de tijd op is |
 
 Bij `Config.SoundIds` kun je ook geluidseffecten invullen: `Key` (sleutel gevonden), `Shush` (het monster ziet je),
 `Heartbeat` (hartslag als het monster dichtbij is), `Portal` (naar binnen gaan) en `Coins` (munten).
-Met `Config.MusicVolume` zet je de muziek harder of zachter. Spelers kunnen de muziek uitzetten bij **Instellingen (Z)**.
+Met `Config.MusicVolume` zet je de muziek harder of zachter. Spelers kunnen de muziek uitzetten bij **Settings (Z)**.
 
 > Gebruik geluiden van Roblox zelf of geluiden die openbaar zijn gemaakt. Andere geluiden blijven stil in jouw spel;
 > dan zie je een melding in het Output-venster.
@@ -160,7 +161,7 @@ de hal staat rond het punt (0, 0, 0) en is 140 × 100 studs; de zalen staan bij 
 | `src/server/LibraryBuilder.luau` | Bouwt de bibliotheek: muren met bogen en pilaren, dakraam, kasten met bordjes, lampen, planten, tafels |
 | `src/server/BookService.luau` | Boeken in een zaal: verspreiden, oppakken, dragen en terugzetten |
 | `src/server/ShopService.luau` | Winkel, magie en de assistent |
-| `src/server/MonsterService.luau` | De AI van De Bibliothecaresse (patrouilleren, horen, zien, jagen) |
+| `src/server/MonsterService.luau` | De AI van The Librarian (patrouilleren, horen, zien, jagen) |
 | `src/server/KeyService.luau` | De vier sleutels en hun upgrades |
 | `src/server/HideService.luau` | Verstoppen in kasten |
 | `src/server/DataService.luau` | Munten, sleutels en records opslaan |

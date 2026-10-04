@@ -647,7 +647,7 @@ local function buildSection(parent: Folder, section: Config.Section, index: numb
 		att.Position = Vector3.new(x, -2, 0)
 		att.Parent = front
 		local prompt = Instance.new("ProximityPrompt")
-		prompt.ActionText = "Boeken terugzetten"
+		prompt.ActionText = "Shelve books"
 		prompt.ObjectText = title
 		prompt.HoldDuration = 0.2
 		prompt.MaxActivationDistance = 9
@@ -802,8 +802,8 @@ local function buildLocker(parent: Folder, pos: Vector3, facing: Vector3): Locke
 	})
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Verstoppen"
-	prompt.ObjectText = "Kast"
+	prompt.ActionText = "Hide"
+	prompt.ObjectText = "Wardrobe"
 	prompt.HoldDuration = 0.3
 	prompt.MaxActivationDistance = 7
 	prompt.RequiresLineOfSight = false
@@ -868,8 +868,8 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 
 	-- Deur terug naar de hal
 	local exitPrompt = Instance.new("ProximityPrompt")
-	exitPrompt.ActionText = "Terug naar de hal"
-	exitPrompt.ObjectText = "Deur"
+	exitPrompt.ActionText = "Back to the lobby"
+	exitPrompt.ObjectText = "Door"
 	exitPrompt.HoldDuration = 0.5
 	exitPrompt.MaxActivationDistance = 12
 	exitPrompt.RequiresLineOfSight = false

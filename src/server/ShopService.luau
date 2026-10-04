@@ -34,45 +34,45 @@ local function buy(player: Player, kind: string, id: string)
 		end
 		local level = profile.Upgrades[id] or 0
 		if level >= item.MaxLevel then
-			notify(player, item.Name .. " is al op het hoogste niveau.", BAD)
+			notify(player, item.Name .. " is already at the highest level.", BAD)
 			return
 		end
 		local cost = Config.ShopCost(item, level)
 		if not DataService.SpendCoins(player, cost) then
-			notify(player, "Niet genoeg munten! Je hebt er " .. cost .. " nodig.", BAD)
+			notify(player, "Not enough coins! You need " .. cost .. ".", BAD)
 			return
 		end
 		profile.Upgrades[id] = level + 1
-		notify(player, string.format("%s %s gekocht! (niveau %d)", item.Icon, item.Name, level + 1), GOOD)
+		notify(player, string.format("%s %s bought! (level %d)", item.Icon, item.Name, level + 1), GOOD)
 	elseif kind == "Magic" then
 		local info = Config.FindMagic(id)
 		if not info then
 			return
 		end
 		if profile.Magic[id] then
-			notify(player, "Die magie heb je al.", BAD)
+			notify(player, "You already have that magic.", BAD)
 			return
 		end
 		if not DataService.SpendCoins(player, info.Cost) then
-			notify(player, "Niet genoeg munten! Je hebt er " .. info.Cost .. " nodig.", BAD)
+			notify(player, "Not enough coins! You need " .. info.Cost .. ".", BAD)
 			return
 		end
 		profile.Magic[id] = true
 		local slot = table.find(Config.Magic, info) or 0
-		notify(player, string.format("%s %s ontgrendeld! Druk op %d.", info.Icon, info.Name, slot), GOOD)
+		notify(player, string.format("%s %s unlocked! Press %d.", info.Icon, info.Name, slot), GOOD)
 	elseif kind == "Assistant" then
 		local nextLevel = profile.Assistant + 1
 		local levelInfo = Config.Assistant.Levels[nextLevel]
 		if not levelInfo then
-			notify(player, Config.Assistant.Name .. " is al op het hoogste niveau.", BAD)
+			notify(player, Config.Assistant.Name .. " is already at the highest level.", BAD)
 			return
 		end
 		if not DataService.SpendCoins(player, levelInfo.Cost) then
-			notify(player, "Niet genoeg munten! Je hebt er " .. levelInfo.Cost .. " nodig.", BAD)
+			notify(player, "Not enough coins! You need " .. levelInfo.Cost .. ".", BAD)
 			return
 		end
 		profile.Assistant = nextLevel
-		notify(player, string.format("🦉 %s helpt je nu (niveau %d)!", Config.Assistant.Name, nextLevel), GOOD)
+		notify(player, string.format("🦉 %s is helping you now (level %d)!", Config.Assistant.Name, nextLevel), GOOD)
 	else
 		return
 	end
@@ -103,14 +103,14 @@ local function useAbility(player: Player, id: string)
 			mine[id] = now + info.Cooldown
 			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
 		end
-		notify(player, if got > 0 then string.format("🧲 %d boek%s verzameld!", got, if got == 1 then "" else "en") else "🧲 Geen boeken in de buurt (of je handen zijn vol).", Color3.fromRGB(150, 210, 255))
+		notify(player, if got > 0 then string.format("🧲 %d book%s gathered!", got, if got == 1 then "" else "s") else "🧲 No books nearby (or your hands are full).", Color3.fromRGB(150, 210, 255))
 	elseif id == "AutoShelf" then
 		local placed = if books then books:AutoShelf(player) else 0
 		if placed > 0 then
 			mine[id] = now + info.Cooldown
 			player:SetAttribute("Cooldown_" .. id, Workspace:GetServerTimeNow() + info.Cooldown)
 		end
-		notify(player, if placed > 0 then string.format("✨ %d boek%s vliegen naar hun kast!", placed, if placed == 1 then "" else "en") else "✨ Je draagt geen boeken.", Color3.fromRGB(255, 230, 140))
+		notify(player, if placed > 0 then string.format("✨ %d book%s flying to their shelves!", placed, if placed == 1 then "" else "s") else "✨ You are not carrying any books.", Color3.fromRGB(255, 230, 140))
 	end
 end
 

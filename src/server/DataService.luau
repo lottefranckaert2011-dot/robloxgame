@@ -30,7 +30,7 @@ do
 	if ok then
 		store = result
 	else
-		warn("[Data] DataStore niet beschikbaar, voortgang wordt niet opgeslagen: " .. tostring(result))
+		warn("[Data] DataStore unavailable, progress will not be saved: " .. tostring(result))
 	end
 end
 
@@ -70,7 +70,7 @@ local function load(player: Player): Profile
 				end
 			end
 		elseif not ok then
-			warn("[Data] Laden mislukt voor " .. player.Name .. ": " .. tostring(data))
+			warn("[Data] Loading failed for " .. player.Name .. ": " .. tostring(data))
 		end
 	end
 	return profile
@@ -85,7 +85,7 @@ local function save(player: Player)
 		store:SetAsync("player_" .. player.UserId, profile)
 	end)
 	if not ok then
-		warn("[Data] Opslaan mislukt voor " .. player.Name .. ": " .. tostring(err))
+		warn("[Data] Saving failed for " .. player.Name .. ": " .. tostring(err))
 	end
 end
 
@@ -99,7 +99,7 @@ local function updateStats(player: Player)
 	if not profile or not stats then
 		return
 	end
-	local coins = stats:FindFirstChild("Munten") :: IntValue?
+	local coins = stats:FindFirstChild("Coins") :: IntValue?
 	if coins then
 		coins.Value = profile.Coins
 	end
@@ -127,7 +127,7 @@ end
 
 function DataService.SetRoundBooks(player: Player, value: number)
 	local stats = player:FindFirstChild("leaderstats")
-	local books = stats and stats:FindFirstChild("Boeken") :: IntValue?
+	local books = stats and stats:FindFirstChild("Books") :: IntValue?
 	if books then
 		books.Value = value
 	end
@@ -135,7 +135,7 @@ end
 
 function DataService.GetRoundBooks(player: Player): number
 	local stats = player:FindFirstChild("leaderstats")
-	local books = stats and stats:FindFirstChild("Boeken") :: IntValue?
+	local books = stats and stats:FindFirstChild("Books") :: IntValue?
 	return if books then books.Value else 0
 end
 
@@ -143,10 +143,10 @@ local function onPlayerAdded(player: Player)
 	local stats = Instance.new("Folder")
 	stats.Name = "leaderstats"
 	local books = Instance.new("IntValue")
-	books.Name = "Boeken"
+	books.Name = "Books"
 	books.Parent = stats
 	local coins = Instance.new("IntValue")
-	coins.Name = "Munten"
+	coins.Name = "Coins"
 	coins.Parent = stats
 	stats.Parent = player
 

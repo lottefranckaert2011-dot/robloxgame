@@ -334,7 +334,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 			state = "Chase"
 			target = player
 			sawHide = false
-			Remotes.Notify:FireClient(player, "Ze heeft je gezien! RENNEN!", Color3.fromRGB(255, 40, 40))
+			Remotes.Notify:FireClient(player, "She saw you! RUN!", Color3.fromRGB(255, 40, 40))
 			if head then
 				Sounds.Play("Shush", head, 1)
 			end
@@ -508,7 +508,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 				humanoid:MoveTo(hrp.Position)
 			else
 				if now - lastSeen > M.LoseTargetTime then
-					Remotes.Notify:FireClient(player, "Ze is je kwijt... voor nu.", Color3.fromRGB(200, 200, 255))
+					Remotes.Notify:FireClient(player, "She lost you... for now.", Color3.fromRGB(200, 200, 255))
 					state = "Investigate"
 					target = nil
 					setGoal(lastKnown or hrp.Position)
@@ -572,7 +572,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		loopId += 1
 		local myId = loopId
 		for _, player in getPlayers() do
-			Remotes.Notify:FireClient(player, M.Name .. " is wakker geworden... wees STIL.", Color3.fromRGB(255, 60, 60))
+			Remotes.Notify:FireClient(player, M.Name .. " has woken up... stay QUIET.", Color3.fromRGB(255, 60, 60))
 		end
 		task.spawn(function()
 			while running and loopId == myId do

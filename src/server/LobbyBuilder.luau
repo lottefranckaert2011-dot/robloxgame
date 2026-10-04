@@ -407,7 +407,7 @@ local function buildStand(folder: Folder, position: Vector3, facing: Vector3, ti
 	signText(sign, Enum.NormalId.Front, title, color)
 	signText(sign, Enum.NormalId.Back, title, color)
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Openen"
+	prompt.ActionText = "Open"
 	prompt.ObjectText = title
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
@@ -532,7 +532,7 @@ local function buildDoor(folder: Folder, room: Config.RoomInfo, x: number): Door
 	light.Parent = zone
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Naar binnen"
+	prompt.ActionText = "Enter"
 	prompt.ObjectText = room.Name
 	prompt.HoldDuration = 0.2
 	prompt.MaxActivationDistance = 12
@@ -562,12 +562,12 @@ function LobbyBuilder.Build(parent: Instance): Lobby
 		buildPlant(folder, spot)
 	end
 
-	buildStand(folder, Vector3.new(-58, 0, 12), Vector3.new(1, 0, 0), "WINKEL", Color3.fromRGB(255, 110, 200), "Shop")
-	buildStand(folder, Vector3.new(58, 0, 12), Vector3.new(-1, 0, 0), "MAGIE", Color3.fromRGB(110, 190, 255), "Magic")
+	buildStand(folder, Vector3.new(-58, 0, 12), Vector3.new(1, 0, 0), "SHOP", Color3.fromRGB(255, 110, 200), "Shop")
+	buildStand(folder, Vector3.new(58, 0, 12), Vector3.new(-1, 0, 0), "MAGIC", Color3.fromRGB(110, 190, 255), "Magic")
 
 	-- Welkomstbord boven de ingang
 	local welcome = deco({ Name = "Welcome", Size = Vector3.new(40, 6, 0.2), Position = Vector3.new(0, 20, HZ - 0.3), Transparency = 1, Parent = folder })
-	signText(welcome, Enum.NormalId.Front, "Kies een zaal!", Color3.fromRGB(255, 220, 120))
+	signText(welcome, Enum.NormalId.Front, "Choose a hall!", Color3.fromRGB(255, 220, 120))
 
 	local doors = {}
 	local count = #Config.Rooms

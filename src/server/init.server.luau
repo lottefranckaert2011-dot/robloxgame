@@ -58,4 +58,4 @@ DataService.Init()
 RoomService.Init(lobby) -- bouwt de zalen
 ShopService.Init()
 
-print(Config.GameName .. " is gestart!")
+print(Config.GameName .. " has started!")

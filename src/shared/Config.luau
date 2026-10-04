@@ -72,9 +72,9 @@ Config.StaminaRegen = 14 -- per seconde
 Config.CoinsPerBook = 2
 Config.CoinsForWin = 150
 
--- Het monster: "De Bibliothecaresse"
+-- Het monster: "The Librarian"
 Config.Monster = {
-	Name = "De Bibliothecaresse",
+	Name = "The Librarian",
 	WanderSpeed = 11,
 	ChaseSpeedStart = 17,
 	ChaseSpeedEnd = 21, -- sneller naarmate er meer boeken terug staan
@@ -102,36 +102,36 @@ export type MagicInfo = {
 Config.Magic = {
 	{
 		Id = "Insight",
-		Name = "Inzicht",
+		Name = "Insight",
 		Icon = "👁",
-		Description = "Laat alle boeken in de buurt oplichten",
+		Description = "Makes all nearby books light up",
 		Cost = 20,
 		Cooldown = 25,
 		Key = Enum.KeyCode.One,
 	},
 	{
 		Id = "ShelfGuide",
-		Name = "Kastgids",
+		Name = "Shelf Guide",
 		Icon = "🧭",
-		Description = "Een lichtstraal wijst naar de kast van je boek",
+		Description = "A beam of light points to your book's shelf",
 		Cost = 40,
 		Cooldown = 15,
 		Key = Enum.KeyCode.Two,
 	},
 	{
 		Id = "Assemble",
-		Name = "Verzamelen",
+		Name = "Gather",
 		Icon = "🧲",
-		Description = "Trekt de dichtstbijzijnde boeken naar je toe",
+		Description = "Pulls the nearest books towards you",
 		Cost = 120,
 		Cooldown = 30,
 		Key = Enum.KeyCode.Three,
 	},
 	{
 		Id = "AutoShelf",
-		Name = "Auto-plaatsen",
+		Name = "Auto-Shelve",
 		Icon = "✨",
-		Description = "Al je boeken vliegen vanzelf naar de goede kast",
+		Description = "All your books fly to the right shelf by themselves",
 		Cost = 250,
 		Cooldown = 60,
 		Key = Enum.KeyCode.Four,
@@ -157,18 +157,18 @@ export type ShopItem = {
 Config.Shop = {
 	{
 		Id = "Capacity",
-		Name = "Grotere Tas",
+		Name = "Bigger Bag",
 		Icon = "🎒",
-		Description = "+1 boek dragen",
+		Description = "Carry +1 book",
 		BaseCost = 40,
 		CostGrowth = 1.6,
 		MaxLevel = 6,
 	},
 	{
 		Id = "Speed",
-		Name = "Snelle Schoenen",
+		Name = "Fast Shoes",
 		Icon = "👟",
-		Description = "+1,5 loopsnelheid",
+		Description = "+1.5 walk speed",
 		BaseCost = 50,
 		CostGrowth = 1.7,
 		MaxLevel = 5,
@@ -178,7 +178,7 @@ Config.SpeedPerLevel = 1.5
 
 -- Assistent: een magische uil die zelf boeken terugzet
 Config.Assistant = {
-	Name = "Uil Oehoe",
+	Name = "Hoot the Owl",
 	Levels = {
 		{ Cost = 150, Interval = 20 },
 		{ Cost = 400, Interval = 13 },
@@ -220,27 +220,27 @@ end
 Config.Keys = {
 	{
 		Id = "Crimson",
-		Name = "Karmijnrode Achthoek",
+		Name = "Crimson Octagon",
 		Color = Color3.fromRGB(200, 30, 45),
-		Description = "Je springt veel hoger",
+		Description = "You jump much higher",
 	},
 	{
 		Id = "Golden",
-		Name = "Gouden Diamant",
+		Name = "Golden Diamond",
 		Color = Color3.fromRGB(255, 196, 40),
-		Description = "+3 draagcapaciteit",
+		Description = "+3 carry capacity",
 	},
 	{
 		Id = "Azure",
-		Name = "Azuurblauwe Ster",
+		Name = "Azure Star",
 		Color = Color3.fromRGB(40, 140, 255),
-		Description = "+3 draagcapaciteit",
+		Description = "+3 carry capacity",
 	},
 	{
 		Id = "Emerald",
-		Name = "Smaragdgroene Klaver",
+		Name = "Emerald Clover",
 		Color = Color3.fromRGB(30, 200, 90),
-		Description = "Je sprint veel sneller",
+		Description = "You sprint much faster",
 	},
 } :: { KeyInfo }
 
@@ -304,46 +304,46 @@ end
 
 -- 31 kastsecties: 1A–1N op de begane grond, 2A–2Q op de eerste verdieping
 Config.Sections = {
-	{ Code = "1A", Name = "Studio", Floor = 1, Titles = { "Mijn Eerste Script", "Parts & Welds", "Debuggen om Middernacht" } },
-	{ Code = "1B", Name = "Simulators", Floor = 1, Titles = { "Klik 1 Miljoen Keer", "Rebirth Geheimen", "Huisdieren Simulator Gids" } },
-	{ Code = "1C", Name = "Avatar & Catalogus", Floor = 1, Titles = { "Hoeden door de Eeuwen", "De Perfecte Outfit", "Dominus Dromen" } },
-	{ Code = "1D", Name = "Mythes", Floor = 1, Titles = { "Het Verhaal van Guest 666", "Legendes van de Oude Server", "De Verloren Badge" } },
-	{ Code = "1E", Name = "DevEx", Floor = 1, Titles = { "Robux naar Euro", "Rijk met Games", "Het Grote Uitbetaalboek" } },
-	{ Code = "1F", Name = "Regels & Moderatie", Floor = 1, Titles = { "Wees Vriendelijk", "Het Verbanboek", "Rapporteren voor Beginners" } },
-	{ Code = "1G", Name = "Obby & Parkour", Floor = 1, Titles = { "Lava is Heet", "1000 Stages Later", "Springen als een Pro" } },
-	{ Code = "1H", Name = "Horror", Floor = 1, Titles = { "Het Krakende Trapgat", "Ogen in het Donker", "Wie Fluistert Daar?" } },
-	{ Code = "1I", Name = "Economie & Handel", Floor = 1, Titles = { "Ruilen Zonder Scams", "Vraag en Aanbod", "De Limited Markt" } },
-	{ Code = "1J", Name = "Geschiedenis", Floor = 1, Titles = { "Roblox in 2006", "Kastelen en Ridders", "De Oude Bibliotheek" } },
-	{ Code = "1K", Name = "Kookboeken", Floor = 1, Titles = { "Pizza Fabriek Recepten", "Taart voor Noobs", "Soep van de Heks" } },
-	{ Code = "1L", Name = "Sprookjes", Floor = 1, Titles = { "De Slapende Bibliothecaris", "Drie Kleine Noobs", "Het Gouden Boek" } },
-	{ Code = "1M", Name = "Ruimtevaart", Floor = 1, Titles = { "Raketten Bouwen", "Leven op Mars", "Zwarte Gaten" } },
-	{ Code = "1N", Name = "Dieren", Floor = 1, Titles = { "Katten Weten Alles", "De Slimme Uil", "Onder de Zee" } },
+	{ Code = "1A", Name = "Studio", Floor = 1, Titles = { "My First Script", "Parts & Welds", "Debugging at Midnight" } },
+	{ Code = "1B", Name = "Simulators", Floor = 1, Titles = { "Click a Million Times", "Rebirth Secrets", "Pet Simulator Guide" } },
+	{ Code = "1C", Name = "Avatar & Catalog", Floor = 1, Titles = { "Hats Through the Ages", "The Perfect Outfit", "Dominus Dreams" } },
+	{ Code = "1D", Name = "Myths", Floor = 1, Titles = { "The Tale of Guest 666", "Legends of the Old Server", "The Lost Badge" } },
+	{ Code = "1E", Name = "DevEx", Floor = 1, Titles = { "Robux to Real Money", "Rich from Games", "The Big Payout Book" } },
+	{ Code = "1F", Name = "Rules & Moderation", Floor = 1, Titles = { "Be Kind", "The Ban Book", "Reporting for Beginners" } },
+	{ Code = "1G", Name = "Obby & Parkour", Floor = 1, Titles = { "Lava Is Hot", "1000 Stages Later", "Jump Like a Pro" } },
+	{ Code = "1H", Name = "Horror", Floor = 1, Titles = { "The Creaking Stairs", "Eyes in the Dark", "Who Whispers There?" } },
+	{ Code = "1I", Name = "Economy & Trading", Floor = 1, Titles = { "Trading Without Scams", "Supply and Demand", "The Limited Market" } },
+	{ Code = "1J", Name = "History", Floor = 1, Titles = { "Roblox in 2006", "Castles and Knights", "The Old Library" } },
+	{ Code = "1K", Name = "Cookbooks", Floor = 1, Titles = { "Pizza Factory Recipes", "Cake for Noobs", "The Witch's Soup" } },
+	{ Code = "1L", Name = "Fairy Tales", Floor = 1, Titles = { "The Sleeping Librarian", "Three Little Noobs", "The Golden Book" } },
+	{ Code = "1M", Name = "Space", Floor = 1, Titles = { "Building Rockets", "Life on Mars", "Black Holes" } },
+	{ Code = "1N", Name = "Animals", Floor = 1, Titles = { "Cats Know Everything", "The Wise Owl", "Under the Sea" } },
 
-	{ Code = "2A", Name = "Magie", Floor = 2, Titles = { "Spreuken voor Opruimen", "De Zwevende Boeken", "Toverstokken Kiezen" } },
-	{ Code = "2B", Name = "Anime", Floor = 2, Titles = { "Krachtige Kreten", "De Laatste Aflevering", "Ninja Stappen" } },
-	{ Code = "2C", Name = "Meditatie", Floor = 2, Titles = { "Adem In, Adem Uit", "Stilte in de Bibliotheek", "Rust in je Hoofd" } },
-	{ Code = "2D", Name = "Leger", Floor = 2, Titles = { "Tanks en Torens", "Strategie Handboek", "De Grote Verdediging" } },
-	{ Code = "2E", Name = "Brainrot", Floor = 2, Titles = { "Skibidi Wetenschap", "Sigma Grindset", "Wat Zei Hij Nou?" } },
-	{ Code = "2F", Name = "Pretparken", Floor = 2, Titles = { "Achtbanen Ontwerpen", "Suikerspin Rijk", "Het Spookhuis" } },
-	{ Code = "2G", Name = "Techniek", Floor = 2, Titles = { "Tandwielen en Hendels", "Bruggen die Blijven Staan", "Robots Bouwen" } },
-	{ Code = "2H", Name = "Wetenschap", Floor = 2, Titles = { "Explosieve Proefjes", "Het Atoom", "Waarom is de Lucht Blauw?" } },
-	{ Code = "2I", Name = "Piraten", Floor = 2, Titles = { "Schatkaarten Lezen", "Kapitein Krakeling", "Het Vervloekte Schip" } },
-	{ Code = "2J", Name = "Dino's", Floor = 2, Titles = { "T-Rex Tanden", "Fossielen Zoeken", "De Laatste Dino" } },
-	{ Code = "2K", Name = "Sport", Floor = 2, Titles = { "Voetbal Trucs", "Sneller Rennen", "De Grote Finale" } },
-	{ Code = "2L", Name = "Muziek", Floor = 2, Titles = { "Piano voor Spoken", "Beats Maken", "Het Stille Orkest" } },
-	{ Code = "2M", Name = "Kunst", Floor = 2, Titles = { "Schilderen in het Donker", "Beeldhouwen met Blokken", "Kleuren Mengen" } },
-	{ Code = "2N", Name = "Detectives", Floor = 2, Titles = { "Wie Stal het Boek?", "Vingerafdrukken", "Het Raadsel van Kast 13" } },
-	{ Code = "2O", Name = "Spoken", Floor = 2, Titles = { "Spoken Tellen", "Het Koude Hoekje", "Boe!" } },
-	{ Code = "2P", Name = "Vervloekte Boeken", Floor = 2, Titles = { "Lees Mij Niet", "Het Boek dat Terugkijkt", "Bladzijde 666" } },
-	{ Code = "2Q", Name = "Verboden Archief", Floor = 2, Titles = { "Shhhhh...", "De Regels van de Bibliothecaresse", "Nooit Meer Rennen" } },
+	{ Code = "2A", Name = "Magic", Floor = 2, Titles = { "Spells for Tidying Up", "The Floating Books", "Choosing a Wand" } },
+	{ Code = "2B", Name = "Anime", Floor = 2, Titles = { "Powerful Battle Cries", "The Final Episode", "Ninja Steps" } },
+	{ Code = "2C", Name = "Meditation", Floor = 2, Titles = { "Breathe In, Breathe Out", "Silence in the Library", "A Calm Mind" } },
+	{ Code = "2D", Name = "Military", Floor = 2, Titles = { "Tanks and Towers", "Strategy Handbook", "The Great Defense" } },
+	{ Code = "2E", Name = "Brainrot", Floor = 2, Titles = { "Skibidi Science", "Sigma Grindset", "What Did He Just Say?" } },
+	{ Code = "2F", Name = "Theme Parks", Floor = 2, Titles = { "Designing Roller Coasters", "Cotton Candy Empire", "The Haunted House" } },
+	{ Code = "2G", Name = "Engineering", Floor = 2, Titles = { "Gears and Levers", "Bridges That Stay Up", "Building Robots" } },
+	{ Code = "2H", Name = "Science", Floor = 2, Titles = { "Explosive Experiments", "The Atom", "Why Is the Sky Blue?" } },
+	{ Code = "2I", Name = "Pirates", Floor = 2, Titles = { "Reading Treasure Maps", "Captain Crumpet", "The Cursed Ship" } },
+	{ Code = "2J", Name = "Dinosaurs", Floor = 2, Titles = { "T-Rex Teeth", "Fossil Hunting", "The Last Dino" } },
+	{ Code = "2K", Name = "Sports", Floor = 2, Titles = { "Football Tricks", "Run Faster", "The Grand Final" } },
+	{ Code = "2L", Name = "Music", Floor = 2, Titles = { "Piano for Ghosts", "Making Beats", "The Silent Orchestra" } },
+	{ Code = "2M", Name = "Art", Floor = 2, Titles = { "Painting in the Dark", "Sculpting with Blocks", "Mixing Colors" } },
+	{ Code = "2N", Name = "Detectives", Floor = 2, Titles = { "Who Stole the Book?", "Fingerprints", "The Riddle of Shelf 13" } },
+	{ Code = "2O", Name = "Ghosts", Floor = 2, Titles = { "Counting Ghosts", "The Cold Corner", "Boo!" } },
+	{ Code = "2P", Name = "Cursed Books", Floor = 2, Titles = { "Do Not Read Me", "The Book That Looks Back", "Page 666" } },
+	{ Code = "2Q", Name = "Forbidden Archive", Floor = 2, Titles = { "Shhhhh...", "The Librarian's Rules", "Never Run Again" } },
 } :: { Section }
 
 -- De zalen waaruit je in de hal kunt kiezen
 Config.Rooms = {
 	{
 		Id = "Starter",
-		Name = "Starterzaal",
-		Description = "1 verdieping · 12 kasten · geen monster",
+		Name = "Starter Hall",
+		Description = "1 floor · 12 shelves · no monster",
 		Color = Color3.fromRGB(90, 210, 120),
 		Floors = 1,
 		MaxSections = 12,
@@ -357,8 +357,8 @@ Config.Rooms = {
 	},
 	{
 		Id = "Classic",
-		Name = "Grote Zaal",
-		Description = "2 verdiepingen · 31 kasten · De Bibliothecaresse",
+		Name = "Grand Hall",
+		Description = "2 floors · 31 shelves · The Librarian",
 		Color = Color3.fromRGB(90, 160, 255),
 		Floors = 2,
 		MaxSections = 31,
@@ -372,8 +372,8 @@ Config.Rooms = {
 	},
 	{
 		Id = "Nightmare",
-		Name = "Nachtmerriezaal",
-		Description = "Pikdonker · sneller monster · dubbele munten",
+		Name = "Nightmare Hall",
+		Description = "Pitch dark · faster monster · double coins",
 		Color = Color3.fromRGB(220, 60, 90),
 		Floors = 2,
 		MaxSections = 31,

@@ -86,7 +86,7 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 	light.Parent = p
 
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Oprapen"
+	prompt.ActionText = "Pick up"
 	prompt.ObjectText = info.Name
 	prompt.HoldDuration = 0.5
 	prompt.MaxActivationDistance = 8
@@ -99,13 +99,13 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 			roundKeys[player] = keys
 		end
 		if keys[info.Id] then
-			Remotes.Notify:FireClient(player, "Deze sleutel heb je al.", Color3.fromRGB(200, 200, 200))
+			Remotes.Notify:FireClient(player, "You already have this key.", Color3.fromRGB(200, 200, 200))
 			return
 		end
 		keys[info.Id] = true
 		applyUpgrades(player)
 		Sounds.Play("Key", p, 0.8)
-		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s (deze ronde)", info.Name, info.Description), info.Color)
+		Remotes.Notify:FireClient(player, string.format("🔑 %s found! %s (this round)", info.Name, info.Description), info.Color)
 	end)
 
 	-- Langzaam ronddraaien en zweven

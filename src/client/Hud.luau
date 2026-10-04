@@ -298,7 +298,7 @@ local function onRefresh(name: string, fn: () -> ())
 end
 
 local function buildShopPanel()
-	local list = buildPanel("Shop", "Winkel", CRIMSON_EDGE)
+	local list = buildPanel("Shop", "Shop", CRIMSON_EDGE)
 	local rows = {}
 	for i, item in Config.Shop do
 		local row = buildRow(list, i, item.Icon, item.Name, item.Description)
@@ -311,7 +311,7 @@ local function buildShopPanel()
 		for _, item in Config.Shop do
 			local row = rows[item.Id]
 			local level = player:GetAttribute("Up_" .. item.Id) or 0
-			row.Info.Text = string.format("%s  •  niveau %d/%d", item.Description, level, item.MaxLevel)
+			row.Info.Text = string.format("%s  •  level %d/%d", item.Description, level, item.MaxLevel)
 			if level >= item.MaxLevel then
 				setBuyButton(row.Button, "MAX", false, false)
 			else
@@ -323,7 +323,7 @@ local function buildShopPanel()
 end
 
 local function buildMagicPanel()
-	local list = buildPanel("Magic", "Magie", NAVY_EDGE)
+	local list = buildPanel("Magic", "Magic", NAVY_EDGE)
 	local rows = {}
 	for i, info in Config.Magic do
 		local row = buildRow(list, i, info.Icon, string.format("%d · %s", i, info.Name), info.Description)
@@ -341,7 +341,7 @@ local function buildMagicPanel()
 		TextSize = 26,
 		TextColor3 = GOLD,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = "🔑 Sleutels (elke ronde opnieuw zoeken)",
+		Text = "🔑 Keys (find them again every round)",
 		ZIndex = 32,
 		Parent = list,
 	})
@@ -356,8 +356,8 @@ local function buildMagicPanel()
 		for _, info in Config.Magic do
 			local row = rows[info.Id]
 			if player:GetAttribute("Magic_" .. info.Id) then
-				setBuyButton(row.Button, "✔ Ontgrendeld", false, true)
-				row.Info.Text = string.format("%s  •  afkoeltijd %ds", info.Description, info.Cooldown)
+				setBuyButton(row.Button, "✔ Unlocked", false, true)
+				row.Info.Text = string.format("%s  •  cooldown %ds", info.Description, info.Cooldown)
 			else
 				setBuyButton(row.Button, "🪙 " .. info.Cost, true, coins() >= info.Cost)
 			end
@@ -365,14 +365,14 @@ local function buildMagicPanel()
 		for _, info in Config.Keys do
 			local row = keyRows[info.Id]
 			local has = player:GetAttribute("Key_" .. info.Id) == true
-			row.Button.Text = if has then "✔ Gevonden" else "❓ Zoek!"
+			row.Button.Text = if has then "✔ Found" else "❓ Search!"
 			row.Button.BackgroundColor3 = if has then info.Color else Color3.fromRGB(70, 76, 96)
 		end
 	end)
 end
 
 local function buildAssistantPanel()
-	local list = buildPanel("Assistant", "Assistent", NAVY_EDGE)
+	local list = buildPanel("Assistant", "Assistant", NAVY_EDGE)
 	local row = buildRow(list, 1, "🦉", Config.Assistant.Name, "")
 	row.Button.Activated:Connect(function()
 		Remotes.Action:FireServer("Buy", "Assistant", "Owl")
@@ -387,8 +387,8 @@ local function buildAssistantPanel()
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = Color3.fromRGB(210, 215, 235),
-		Text = "Je magische uil laat af en toe een boek naar de goede kast zweven. "
-			.. "Hoe hoger het niveau, hoe vaker hij helpt. De boeken die hij terugzet tellen voor jou en leveren munten op.",
+		Text = "Your magic owl now and then floats a book to the right shelf. "
+			.. "The higher its level, the more often it helps. Books it puts back count for you and earn coins.",
 		ZIndex = 32,
 		Parent = list,
 	})
@@ -397,10 +397,10 @@ local function buildAssistantPanel()
 		local current = Config.Assistant.Levels[level]
 		local nextInfo = Config.Assistant.Levels[level + 1]
 		row.Info.Text = if current
-			then string.format("Niveau %d: zet elke %d seconden een boek terug", level, current.Interval)
-			else "Nog geen assistent"
+			then string.format("Level %d: puts back a book every %d seconds", level, current.Interval)
+			else "No assistant yet"
 		if nextInfo then
-			local label = if level == 0 then "Koop" else "Niv. " .. (level + 1)
+			local label = if level == 0 then "Buy" else "Lvl " .. (level + 1)
 			setBuyButton(row.Button, label .. " 🪙" .. nextInfo.Cost, true, coins() >= nextInfo.Cost)
 		else
 			setBuyButton(row.Button, "MAX", false, false)
@@ -409,11 +409,11 @@ local function buildAssistantPanel()
 end
 
 local function buildSettingsPanel()
-	local list = buildPanel("Settings", "Instellingen", NAVY_EDGE)
+	local list = buildPanel("Settings", "Settings", NAVY_EDGE)
 	local options = {
-		{ "Music", "🎵", "Muziek", "Muziek en hartslag aan of uit" },
-		{ "Shake", "📳", "Schermschudden", "Het beeld trilt als het monster dichtbij is" },
-		{ "Danger", "🟥", "Gevarenrand", "Rode rand als het monster dichtbij is" },
+		{ "Music", "🎵", "Music", "Music and heartbeat on or off" },
+		{ "Shake", "📳", "Screen shake", "The screen shakes when the monster is close" },
+		{ "Danger", "🟥", "Danger border", "Red border when the monster is close" },
 	}
 	local rows = {}
 	for i, option in options do
@@ -436,20 +436,20 @@ local function buildSettingsPanel()
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = Color3.fromRGB(210, 215, 235),
-		Text = "Besturing\n"
-			.. "E  boek oppakken / terugzetten / verstoppen\n"
-			.. "1-4  magie gebruiken (eerst kopen bij Magie)\n"
-			.. "Shift  sprinten (maakt lawaai!)\n"
-			.. "G  boeken laten vallen\n"
-			.. "F Winkel  •  C Magie  •  M Assistent  •  Z Instellingen\n\n"
-			.. "Lees de code op elk boek (bijv. 1H) en breng het naar de kast met hetzelfde groene bordje.",
+		Text = "Controls\n"
+			.. "E  pick up / shelve books / hide\n"
+			.. "1-4  use magic (buy it in Magic first)\n"
+			.. "Shift  sprint (makes noise!)\n"
+			.. "G  drop your books\n"
+			.. "F Shop  •  C Magic  •  M Assistant  •  Z Settings\n\n"
+			.. "Read the code on each book (e.g. 1H) and bring it to the shelf with the same green sign.",
 		ZIndex = 32,
 		Parent = list,
 	})
 	onRefresh("Settings", function()
 		for key, row in rows do
 			local on = (Hud.Settings :: any)[key] == true
-			setBuyButton(row.Button, if on then "AAN" else "UIT", true, on)
+			setBuyButton(row.Button, if on then "ON" else "OFF", true, on)
 		end
 	end)
 end
@@ -473,14 +473,14 @@ local function buildMenu()
 		Size = UDim2.new(1, 0, 0, 26),
 		Font = Enum.Font.Fantasy,
 		TextSize = 22,
-		Text = "Ruim alle kasten op",
+		Text = "Clean up every shelf",
 		Parent = holder,
 	})
 	local items = {
-		{ "Shop", "Winkel", "F", true },
-		{ "Magic", "Magie", "C", false },
-		{ "Assistant", "Assistent", "M", false },
-		{ "Settings", "Instellingen", "Z", false },
+		{ "Shop", "Shop", "F", true },
+		{ "Magic", "Magic", "C", false },
+		{ "Assistant", "Assistant", "M", false },
+		{ "Settings", "Settings", "Z", false },
 	}
 	for i, item in items do
 		local name, label, key, red = item[1], item[2], item[3], item[4]
@@ -770,7 +770,7 @@ local function buildRoomChooser()
 		Size = UDim2.new(1, 0, 0, 50),
 		Font = SERIF,
 		TextSize = 46,
-		Text = "📖 Kies een zaal",
+		Text = "📖 Choose a hall",
 		ZIndex = 26,
 		Parent = chooser,
 	})
@@ -830,7 +830,7 @@ local function buildRoomChooser()
 			TextWrapped = true,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextColor3 = Color3.fromRGB(215, 220, 240),
-			Text = string.format("%s\n\n⏱ %d minuten\n📚 %d boeken\n🪙 %s× munten", room.Description, minutes, Config.RoomTotalBooks(room), tostring(room.CoinMultiplier)),
+			Text = string.format("%s\n\n⏱ %d minutes\n📚 %d books\n🪙 %s× coins", room.Description, minutes, Config.RoomTotalBooks(room), tostring(room.CoinMultiplier)),
 			ZIndex = 27,
 			Parent = card,
 		})
@@ -842,7 +842,7 @@ local function buildRoomChooser()
 			Font = ROUND,
 			TextSize = 24,
 			TextColor3 = WHITE,
-			Text = "▶ Spelen",
+			Text = "▶ Play",
 			ZIndex = 27,
 			Parent = card,
 		})
@@ -874,7 +874,7 @@ local function buildRoomChooser()
 				pro.Text = "⭐ Pro " .. level
 				pro.BackgroundColor3 = Color3.fromRGB(190, 130, 30)
 			else
-				pro.Text = "🔒 Pro: win eerst"
+				pro.Text = "🔒 Pro: win first"
 				pro.BackgroundColor3 = Color3.fromRGB(70, 76, 96)
 			end
 		end
@@ -883,7 +883,7 @@ local function buildRoomChooser()
 		pro.Activated:Connect(function()
 			local level = player:GetAttribute("Ascend_" .. room.Id) or 0
 			if level <= 0 then
-				Hud.Notify("Win eerst de " .. room.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+				Hud.Notify("Win the " .. room.Name .. " first to unlock Pro Mode!", Color3.fromRGB(255, 200, 120))
 				return
 			end
 			chooser.Visible = false
@@ -899,7 +899,7 @@ local function buildRoomChooser()
 		TextSize = 15,
 		TextWrapped = true,
 		TextColor3 = Color3.fromRGB(200, 205, 230),
-		Text = "Met vrienden spelen? Sluit dit menu en stap samen in de ring voor een deur. Speelt een vriend al? Dan kom je bij hem of haar.",
+		Text = "Playing with friends? Close this menu and step into the ring in front of a door together. Is a friend already playing? Then you will join them.",
 		ZIndex = 26,
 		Parent = chooser,
 	})
@@ -915,7 +915,7 @@ local function buildLeaveButton()
 		Font = SERIF,
 		TextSize = 26,
 		TextColor3 = WHITE,
-		Text = "🚪 Terug naar de hal",
+		Text = "🚪 Back to the lobby",
 		Visible = false,
 		Parent = gui,
 	})
@@ -934,7 +934,7 @@ local function buildLeaveButton()
 		Font = SERIF,
 		TextSize = 26,
 		TextColor3 = WHITE,
-		Text = "📖 Kies een zaal",
+		Text = "📖 Choose a hall",
 		Visible = false,
 		Parent = gui,
 	})
@@ -1023,7 +1023,7 @@ local function buildOverlays()
 		Size = UDim2.fromOffset(500, 30),
 		Font = SERIF,
 		TextSize = 26,
-		Text = "Je zit verstopt... houd E ingedrukt om eruit te gaan",
+		Text = "You are hiding... hold E to come out",
 		ZIndex = 6,
 		Parent = hiddenOverlay,
 	})
@@ -1101,7 +1101,7 @@ function Hud.SetInventory(list: { any }, capacity: number)
 			Font = Enum.Font.GothamBold,
 			TextSize = 14,
 			TextColor3 = WHITE,
-			Text = string.format("%s  %s%s", book.Code, if section then section.Name else "", if book.Volume then " · deel " .. book.Volume else ""),
+			Text = string.format("%s  %s%s", book.Code, if section then section.Name else "", if book.Volume then " · vol. " .. book.Volume else ""),
 			Parent = chip,
 		})
 	end
@@ -1281,7 +1281,7 @@ local function updateRound()
 			chooser.Visible = true
 		end
 		wasInRoom = false
-		objectiveLabel.Text = "Kies een zaal!"
+		objectiveLabel.Text = "Choose a hall!"
 		return
 	end
 	timerLabel.Visible = true
@@ -1309,10 +1309,10 @@ local function updateRound()
 
 	if state == "Playing" then
 		local left = total - placed
-		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
-		objectiveLabel.Text = proText .. (if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op")
+		sectionsLeftLabel.Text = string.format("%d book%s to go", left, if left == 1 then "" else "s")
+		objectiveLabel.Text = proText .. (if playerCount > 1 then string.format("Cleaning together · 👥 %d", playerCount) else "Clean up every shelf")
 	elseif state == "Starting" then
-		sectionsLeftLabel.Text = "de zaal gaat zo open..."
+		sectionsLeftLabel.Text = "the hall opens soon..."
 		objectiveLabel.Text = message
 	else
 		sectionsLeftLabel.Text = ""
