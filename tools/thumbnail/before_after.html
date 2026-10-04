@@ -21,7 +21,7 @@ const MODE = new URLSearchParams(location.search).get('mode') || 'thumb';
 const W = MODE === 'icon' ? 512 : 1920, H = MODE === 'icon' ? 512 : 1080;
 let seed = 5; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
 renderer.setSize(W, H); renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
@@ -121,76 +121,103 @@ function tidyAisle() {
 
 // ------------------------------------------------ Roblox avatar for the icon
 function faceTex() {
-  return canvasTex(512, 512, (g) => {
-    g.lineCap = 'round';
-    // eyebrows (raised, worried)
-    g.strokeStyle = '#3a1d0f'; g.lineWidth = 22;
-    g.beginPath(); g.moveTo(120, 120); g.quadraticCurveTo(170, 80, 220, 112); g.stroke();
-    g.beginPath(); g.moveTo(292, 112); g.quadraticCurveTo(342, 80, 392, 120); g.stroke();
-    // big eyes
-    for (const ex of [176, 336]) {
-      g.fillStyle = '#fff'; g.beginPath(); g.ellipse(ex, 200, 52, 60, 0, 0, 7); g.fill();
-      g.lineWidth = 8; g.strokeStyle = '#1a1a1a'; g.stroke();
-      g.fillStyle = '#4a2a14'; g.beginPath(); g.ellipse(ex + 4, 212, 28, 32, 0, 0, 7); g.fill();
-      g.fillStyle = '#111'; g.beginPath(); g.ellipse(ex + 4, 214, 15, 18, 0, 0, 7); g.fill();
-      g.fillStyle = '#fff'; g.beginPath(); g.ellipse(ex - 8, 198, 9, 11, 0, 0, 7); g.fill();
+  return canvasTex(1024, 1024, (g) => {
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    // blush
+    for (const bx of [250, 774]) { const gr = g.createRadialGradient(bx, 600, 10, bx, 600, 110); gr.addColorStop(0, 'rgba(255,120,140,0.55)'); gr.addColorStop(1, 'rgba(255,120,140,0)'); g.fillStyle = gr; g.fillRect(bx - 120, 480, 240, 240); }
+    // raised, arched eyebrows
+    g.strokeStyle = '#5a2410'; g.lineWidth = 46;
+    g.beginPath(); g.moveTo(190, 235); g.quadraticCurveTo(300, 200, 440, 135); g.stroke();
+    g.beginPath(); g.moveTo(584, 135); g.quadraticCurveTo(724, 200, 834, 235); g.stroke();
+    // huge eyes, tiny pupils
+    for (const ex of [340, 684]) {
+      g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(ex, 410, 118, 132, 0, 0, 7); g.fill();
+      g.lineWidth = 18; g.strokeStyle = '#141414'; g.stroke();
+      g.fillStyle = '#141414'; g.beginPath(); g.ellipse(ex + (ex < 512 ? 14 : -14), 400, 34, 40, 0, 0, 7); g.fill();
+      g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(ex - 30, 360, 22, 26, 0, 0, 7); g.fill();
     }
     // screaming mouth
-    g.fillStyle = '#2a0c0c'; g.beginPath(); g.moveTo(170, 320); g.quadraticCurveTo(256, 290, 342, 320); g.quadraticCurveTo(330, 450, 256, 455); g.quadraticCurveTo(182, 450, 170, 320); g.fill();
-    g.fillStyle = '#fff'; g.beginPath(); g.moveTo(180, 322); g.quadraticCurveTo(256, 296, 332, 322); g.lineTo(326, 345); g.quadraticCurveTo(256, 324, 186, 345); g.fill();
-    g.fillStyle = '#ff6a7a'; g.beginPath(); g.ellipse(256, 425, 46, 24, 0, 0, 7); g.fill();
-    // sweat drop
-    g.fillStyle = '#7fd4ff'; g.beginPath(); g.moveTo(430, 150); g.quadraticCurveTo(462, 210, 430, 222); g.quadraticCurveTo(398, 210, 430, 150); g.fill();
+    g.fillStyle = '#3a0d12'; g.strokeStyle = '#141414'; g.lineWidth = 16;
+    g.beginPath(); g.ellipse(512, 760, 125, 170, 0, 0, 7); g.closePath(); g.fill(); g.stroke();
+    g.save(); g.clip();
+    g.fillStyle = '#ffffff'; g.fillRect(380, 580, 264, 70);   // top teeth
+    g.fillStyle = '#ff5f78'; g.beginPath(); g.ellipse(512, 905, 105, 75, 0, 0, 7); g.fill(); // tongue
+    g.restore();
+    // sweat drops
+    g.fillStyle = '#6fd0ff'; g.strokeStyle = '#1b5f8a'; g.lineWidth = 8;
+    for (const [x, y, s] of [[880, 150, 1], [140, 230, 0.7]]) {
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 50 * s, y + 110 * s, x, y + 130 * s); g.quadraticCurveTo(x - 50 * s, y + 110 * s, x, y); g.fill(); g.stroke();
+    }
   });
 }
-function icon() {
-  const scene = new THREE.Scene();
-  // background: warm library wall full of books
-  scene.background = new THREE.Color('#6a3a8a');
-  scene.add(new THREE.HemisphereLight('#fff2e0', '#6a3a40', 1.3));
-  const key = new THREE.DirectionalLight('#ffffff', 3.0); key.position.set(4, 8, 10); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); scene.add(key);
-  const rim = new THREE.PointLight('#c48aff', 40, 30, 1.5); rim.position.set(-6, 6, -2); scene.add(rim);
+function shelvesBackground() {
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#5a2f7a');
+  scene.add(new THREE.HemisphereLight('#fff2e0', '#6a3a40', 1.5));
+  const key = new THREE.DirectionalLight('#ffffff', 2.0); key.position.set(4, 8, 10); scene.add(key);
   const wood = new THREE.MeshStandardMaterial({ color: '#9a5428', roughness: 0.6 });
-  for (let r = 0; r < 7; r++) {
-    const sy = -2 + r * 2.2;
+  for (let r = 0; r < 8; r++) {
+    const sy = -3 + r * 2.2;
     const shelf = new THREE.Mesh(new THREE.BoxGeometry(30, 0.25, 1.6), wood); shelf.position.set(0, sy, -6); scene.add(shelf);
     let x = -14;
     while (x < 14) { const bw = 0.35 + rnd() * 0.25, bh = 1.4 + rnd() * 0.5; const b = new THREE.Mesh(rbox(bw, bh, 1.2, 0.04), bookMat(ALL[Math.floor(rnd() * ALL.length)])); b.position.set(x + bw / 2, sy + 0.12 + bh / 2, -6); b.rotation.z = rnd() < 0.1 ? 0.2 : 0; scene.add(b); x += bw + 0.03; }
   }
   const back = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), wood); back.position.set(0, 6, -6.8); scene.add(back);
-  // avatar
-  const skin = new THREE.MeshStandardMaterial({ color: '#f6cfa8', roughness: 0.5 });
-  const shirt = new THREE.MeshStandardMaterial({ color: '#2fbf71', roughness: 0.5 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: '#e0521f', roughness: 0.55 });
-  const av = new THREE.Group(); av.position.set(1.0, -2.6, 4.0); av.rotation.y = 0.1; scene.add(av);
-  const torso = new THREE.Mesh(rbox(3.0, 3.0, 1.5, 0.2), shirt); torso.position.y = 1.5; torso.castShadow = true; av.add(torso);
-  const head = new THREE.Group(); head.position.y = 4.4; head.rotation.set(0.02, -0.05, 0.08); av.add(head);
-  const hm = new THREE.Mesh(rbox(2.4, 2.3, 2.2, 0.55), skin); hm.castShadow = true; head.add(hm);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1), new THREE.MeshStandardMaterial({ map: faceTex(), transparent: true, roughness: 0.5 })); face.position.z = 1.105; head.add(face);
-  // blocky hair: cap, fringe pieces, side pieces and a ponytail
-  const cap = new THREE.Mesh(rbox(2.6, 0.9, 2.4, 0.35), hairMat); cap.position.set(0, 1.15, -0.05); head.add(cap);
-  const fringe = new THREE.Mesh(rbox(2.5, 0.55, 0.45, 0.2), hairMat); fringe.position.set(-0.05, 0.92, 0.95); fringe.rotation.z = -0.08; head.add(fringe);
-  const swoop = new THREE.Mesh(rbox(1.0, 0.75, 0.42, 0.2), hairMat); swoop.position.set(-0.75, 0.62, 1.0); swoop.rotation.z = 0.35; head.add(swoop);
-  for (const s of [-1, 1]) { const side = new THREE.Mesh(rbox(0.45, 1.8, 2.0, 0.2), hairMat); side.position.set(s * 1.25, 0.1, -0.15); head.add(side); }
-  const tail = new THREE.Mesh(rbox(0.9, 1.6, 0.9, 0.35), hairMat); tail.position.set(0.3, 0.2, -1.4); tail.rotation.x = -0.5; head.add(tail);
-  // arms raised, holding a tall wobbly stack of books
-  for (const s of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(s * 2.0, 2.6, 0.2); av.add(arm);
-    const am = new THREE.Mesh(rbox(1.3, 2.8, 1.3, 0.25), skin); am.position.y = 1.1; am.castShadow = true; arm.add(am);
-    arm.rotation.set(-0.35, 0, s * -0.35);
-  }
-  const stack = new THREE.Group(); stack.position.set(-2.7, 4.6, -0.6); stack.rotation.z = 0.38; av.add(stack);
-  for (let i = 0; i < 12; i++) {
-    const s = 0.62 - i * 0.008;
-    book(stack, 3.4 * s, 0.4, 2.4 * s, RAINBOW[i % RAINBOW.length], (rnd() - 0.5) * 0.3 + i * 0.07, i * 0.41, 0, 0, (rnd() - 0.5) * 0.35, (rnd() - 0.5) * 0.08);
-  }
-  // a couple of books falling off the top
-  book(scene, 1.7, 0.36, 1.25, '#ff4fa8', -2.8, 5.2, 5, 0.5, 0.8, 0.9);
-  book(scene, 1.7, 0.36, 1.25, '#1a9be8', 3.6, 4.6, 4, -0.4, 0.2, -0.7);
-  const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 200); cam.position.set(0.4, 2.0, 13.2); cam.lookAt(0.5, 1.4, 4);
-  return render(scene, cam, 0.25);
+  const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 200); cam.position.set(0, 5, 10); cam.lookAt(0, 5, -6);
+  return render(scene, cam, 0.15);
 }
-
+function avatarCutout() {
+  const scene = new THREE.Scene(); scene.background = null;
+  scene.add(new THREE.HemisphereLight('#fff6ea', '#7a4a6a', 1.5));
+  const key = new THREE.DirectionalLight('#fff3e0', 3.0); key.position.set(5, 9, 12); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); scene.add(key);
+  const rimL = new THREE.DirectionalLight('#b48cff', 3.5); rimL.position.set(-8, 6, -6); scene.add(rimL);
+  const rimR = new THREE.DirectionalLight('#ffd27a', 2.5); rimR.position.set(8, 4, -6); scene.add(rimR);
+  const M = (c, r = 0.5) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+  const skin = M('#f7d2ad', 0.45), hoodie = M('#27b56a', 0.6), hoodieDark = M('#1c8a50', 0.6), hair = M('#e4561f', 0.5), hairDark = M('#b83c12', 0.5);
+  const add = (geo, m, x, y, z, parent, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = o.receiveShadow = true; parent.add(o); return o; };
+  const av = new THREE.Group(); av.rotation.y = -0.22; scene.add(av);
+  // hoodie body
+  add(rbox(3.0, 3.0, 1.6, 0.35), hoodie, 0, 1.5, 0, av);
+  add(rbox(2.2, 1.0, 0.7, 0.3), hoodieDark, 0, 3.0, -0.75, av);            // hood behind the neck
+  add(rbox(1.8, 0.8, 0.12, 0.2), hoodieDark, 0, 0.75, 0.82, av);          // pocket
+  for (const sx of [-0.35, 0.35]) add(new THREE.CylinderGeometry(0.06, 0.06, 0.9, 10), M('#ffffff'), sx, 2.35, 0.86, av);
+  add(rbox(1.3, 0.35, 1.3, 0.15), skin, 0, 3.12, 0, av);                    // neck
+  // head
+  const head = new THREE.Group(); head.position.set(0, 4.55, 0.05); head.rotation.set(0.04, 0.0, 0.07); av.add(head);
+  add(rbox(2.6, 2.45, 2.35, 0.8), skin, 0, 0, 0, head);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshStandardMaterial({ map: faceTex(), transparent: true, roughness: 0.45 }));
+  face.position.set(0, -0.12, 1.19); head.add(face);
+  // messy hair: cap + swept locks + back volume
+  add(rbox(2.8, 0.9, 2.6, 0.45), hair, 0, 1.2, -0.12, head);
+  add(rbox(2.7, 1.6, 0.9, 0.4), hair, 0, 0.35, -1.0, head);
+  const locks = [[-0.95, 1.12, 0.98, 0.55, 0.42], [-0.35, 1.22, 1.02, 0.35, 0.18], [0.3, 1.2, 1.0, 0.0, -0.1], [0.9, 1.08, 0.95, -0.3, -0.35]];
+  for (const [x, y, z, rz, tilt] of locks) add(rbox(0.85, 0.95, 0.5, 0.24), x < 0 ? hair : hairDark, x, y, z, head, tilt * 0.3, 0, rz);
+  for (const sx of [-1, 1]) add(rbox(0.42, 1.4, 1.6, 0.2), hair, sx * 1.3, 0.4, -0.3, head);
+  add(rbox(0.7, 0.8, 0.6, 0.25), hairDark, 0.2, 1.8, 0.05, head, 0.3, 0, -0.5);  // a cowlick
+  // arms raised, holding the stack
+  const hands = [];
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Group(); arm.position.set(s * 1.95, 2.75, 0.1); av.add(arm);
+    add(rbox(1.15, 2.9, 1.15, 0.3), hoodie, 0, 1.3, 0, arm);
+    add(rbox(1.2, 0.35, 1.2, 0.15), hoodieDark, 0, 2.75, 0, arm);          // cuff
+    const hand = add(rbox(1.0, 0.85, 1.0, 0.32), skin, 0, 3.2, 0, arm);
+    arm.rotation.set(-0.05, 0, s * 0.07);
+    hands.push(hand);
+  }
+  // wobbly rainbow stack above the head
+  const stack = new THREE.Group(); stack.position.set(-0.1, 6.4, 0.15); stack.rotation.z = 0.08; av.add(stack);
+  for (let i = 0; i < 7; i++) {
+    const s = 0.86 - i * 0.012;
+    const wob = Math.sin(i * 0.9) * 0.18 + i * 0.05;
+    book(stack, 3.6 * s, 0.5, 2.5 * s, RAINBOW[i % RAINBOW.length], wob, i * 0.51, 0, 0, (rnd() - 0.5) * 0.4, (rnd() - 0.5) * 0.06 + (i > 4 ? 0.18 : 0));
+  }
+  // books tumbling down
+  book(av, 2.2, 0.42, 1.6, '#ff4fa8', 2.7, 8.6, 0.6, 0.6, 0.6, -0.8);
+  book(av, 2.0, 0.42, 1.5, '#1a9be8', -2.9, 7.9, 0.9, -0.5, 0.3, 0.7);
+  const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 200); cam.position.set(0.9, 5.0, 12.4); cam.lookAt(0, 5.55, 0);
+  renderer.setClearColor(0x000000, 0);
+  renderer.render(scene, cam);
+  return renderer.domElement.toDataURL('image/png');
+}
 // ------------------------------------------------ compose the final image
 const svg = document.getElementById('out'); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 const star = (x, y, r, fill = '#fffbe6') => `<path d="M ${x} ${y - r} Q ${x + r * 0.16} ${y - r * 0.16} ${x + r} ${y} Q ${x + r * 0.16} ${y + r * 0.16} ${x} ${y + r} Q ${x - r * 0.16} ${y + r * 0.16} ${x - r} ${y} Q ${x - r * 0.16} ${y - r * 0.16} ${x} ${y - r} Z" fill="${fill}" filter="url(#glow)"/>`;
@@ -217,14 +244,32 @@ if (MODE === 'thumb') {
     <path d="M 690 700 C 760 540, 900 490, 1120 515" fill="none" stroke="#ff9a8a" stroke-width="16" stroke-linecap="round" opacity="0.7"/>
   </g>`;
 } else {
-  const img = icon();
+  const bgImg = shelvesBackground();
+  const avImg = avatarCutout();
+  let rays = '';
+  for (let i = 0; i < 18; i++) {
+    const a0 = (i / 18) * Math.PI * 2, a1 = a0 + Math.PI / 18;
+    rays += `<path d="M 256 250 L ${256 + Math.cos(a0) * 520} ${250 + Math.sin(a0) * 520} L ${256 + Math.cos(a1) * 520} ${250 + Math.sin(a1) * 520} Z"/>`;
+  }
   svg.innerHTML = `
   <defs>
     <linearGradient id="ban" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a3a"/><stop offset="1" stop-color="#b8001a"/></linearGradient>
+    <radialGradient id="burst" cx="0.5" cy="0.49" r="0.6"><stop offset="0" stop-color="#fff6c2" stop-opacity="0.95"/><stop offset="0.5" stop-color="#ffd84a" stop-opacity="0.45"/><stop offset="1" stop-color="#ffb000" stop-opacity="0"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="3.5"/></filter>
     <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="sticker" x="-10%" y="-10%" width="120%" height="120%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="5" result="thick"/>
+      <feFlood flood-color="#141414"/><feComposite in2="thick" operator="in" result="outline"/>
+      <feDropShadow in="outline" dx="0" dy="6" stdDeviation="5" flood-color="#000" flood-opacity="0.45" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <image href="${img}" width="512" height="512"/>
-  ${star(452, 64, 22)}${star(70, 300, 16)}
+  <image href="${bgImg}" width="512" height="512" filter="url(#blur)"/>
+  <rect width="512" height="512" fill="#2a0f40" opacity="0.35"/>
+  <g fill="#fff3b0" opacity="0.28">${rays}</g>
+  <circle cx="256" cy="250" r="300" fill="url(#burst)"/>
+  <image href="${avImg}" width="512" height="512" filter="url(#sticker)"/>
+  ${star(452, 64, 22)}${star(60, 120, 16)}${star(470, 330, 14)}
   <rect x="-10" y="412" width="532" height="110" fill="#1a1a1a"/>
   <rect x="-10" y="420" width="532" height="100" fill="url(#ban)"/>
   <text x="256" y="494" font-family="Luckiest Guy" font-size="66" text-anchor="middle" fill="#ffffff" stroke="#1a1a1a" stroke-width="10" stroke-linejoin="round" paint-order="stroke">NEVER SLEEPS</text>`;
