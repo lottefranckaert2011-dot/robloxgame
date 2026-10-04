@@ -59,6 +59,18 @@ Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start
 Config.QueueTime = 10 -- zo lang telt de ring af voordat de groep naar binnen gaat
 Config.MaxGroupSize = 8 -- zoveel spelers kunnen samen in één zaal
 Config.MaxCopiesPerRoom = 4 -- zoveel groepen kunnen tegelijk dezelfde soort zaal spelen
+
+-- Boekenseries: in elke kast hoort een serie (deel 1, 2, 3) die in de goede volgorde terug moet
+Config.SeriesLength = 3
+
+-- Pro Mode (Ascend): win een zaal en speel hem opnieuw op een hoger niveau
+Config.Pro = {
+	MaxLevel = 5,
+	TimePerLevel = 0.12, -- elk niveau 12% minder tijd
+	MinTimeFactor = 0.4,
+	MonsterSpeedPerLevel = 0.08, -- elk niveau 8% sneller monster (ook in de Starterzaal komt er een)
+	CoinBonusPerLevel = 0.5, -- elk niveau +50% munten
+}
 Config.CopySpacing = Vector3.new(0, 0, 400) -- afstand tussen kopieën van een zaal
 Config.EndScreenTime = 8 -- daarna ga je terug naar de hal
 Config.RespawnTime = 4
@@ -609,7 +621,11 @@ export type BookData = {
 	Color: Color3,
 	Scale: number,
 	Font: Enum.Font,
+	Volume: number?, -- deel van een serie (1, 2, 3), of nil voor een los boek
 }
+
+local ROMAN = { "I", "II", "III", "IV", "V" }
+local SERIES_GOLD = Color3.fromRGB(255, 214, 110)
 
 local BOOK_COLORS = {
 	Color3.fromRGB(196, 52, 48),
@@ -726,7 +742,13 @@ local function buildBookParts(book: BookData, scale: number): BasePart
 	code.TextScaled = true
 	code.Font = Enum.Font.GothamBlack
 	code.TextColor3 = title.TextColor3
-	code.Text = book.Code
+	code.Text = if book.Volume then book.Code .. " · " .. (ROMAN[book.Volume] or tostring(book.Volume)) else book.Code
+	if book.Volume then
+		-- Serieboeken hebben een extra brede gouden band en een gouden rug
+		code.TextColor3 = SERIES_GOLD
+		band.Size = UDim2.new(1, 0, 0.14, 0)
+		band2.Size = UDim2.new(1, 0, 0.14, 0)
+	end
 	code.Parent = spine
 
 	cover:SetAttribute("IsBook", true)
@@ -796,6 +818,8 @@ export type BookService = typeof(setmetatable(
 		Active: boolean,
 		Carried: { [Player]: { BookData } },
 		PlacedPerSection: { [string]: number },
+		SeriesPlaced: { [string]: number },
+		NormalPlaced: { [string]: number },
 		BookData: { [BasePart]: BookData },
 		OnAllPlaced: (() -> ())?,
 		OnMistake: ((player: Player, position: Vector3) -> ())?,
@@ -815,6 +839,8 @@ function BookService.new(room: Config.RoomInfo, library, state: Instance): BookS
 		Active = false, -- alleen tijdens een ronde kun je boeken pakken
 		Carried = {},
 		PlacedPerSection = {},
+		SeriesPlaced = {},
+		NormalPlaced = {},
 		BookData = {},
 		OnAllPlaced = nil,
 		OnMistake = nil,
@@ -848,7 +874,7 @@ function BookService.Changed(self: BookService, player: Player)
 	updateCarryVisual(player, books)
 	local list = {}
 	for _, book in books do
-		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color })
+		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color, Volume = book.Volume })
 	end
 	Remotes.Inventory:FireClient(player, list, getCapacity(player))
 end
@@ -870,7 +896,9 @@ function BookService.MakeLooseBook(self: BookService, book: BookData, surface: C
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Oppakken"
-	prompt.ObjectText = string.format("[%s] %s", book.Code, book.Title)
+	prompt.ObjectText = if book.Volume
+		then string.format("[%s] %s (deel %d van %d)", book.Code, book.Title, book.Volume, Config.SeriesLength)
+		else string.format("[%s] %s", book.Code, book.Title)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 9
 	prompt.RequiresLineOfSight = false
@@ -926,10 +954,29 @@ function BookService.UpdateSign(self: BookService, section)
 	end
 end
 
--- Zet één boek op de volgende lege plek in de kast
+-- Hoeveel boeken per kast bij de serie horen (0 als er te weinig boeken zijn)
+function BookService.SeriesSize(self: BookService): number
+	return if self.Room.BooksPerSection >= Config.SeriesLength * 2 then Config.SeriesLength else 0
+end
+
+-- Mag dit boek nu al in de kast? Serieboeken moeten op volgorde: eerst deel 1, dan 2, dan 3.
+function BookService.CanPlace(self: BookService, book: BookData): boolean
+	return book.Volume == nil or (self.SeriesPlaced[book.Code] or 0) == book.Volume - 1
+end
+
+-- Zet één boek op zijn plek in de kast. De serie staat vooraan, de losse boeken daarna.
 function BookService.FillSlot(self: BookService, section, book: BookData)
 	local count = (self.PlacedPerSection[section.Code] or 0) + 1
-	local slot = section.Slots[count]
+	local slotIndex
+	if book.Volume then
+		slotIndex = book.Volume
+		self.SeriesPlaced[section.Code] = book.Volume
+	else
+		local normal = (self.NormalPlaced[section.Code] or 0) + 1
+		self.NormalPlaced[section.Code] = normal
+		slotIndex = self:SeriesSize() + normal
+	end
+	local slot = section.Slots[slotIndex]
 	if slot then
 		slot.Transparency = 0
 		slot.Material = Enum.Material.SmoothPlastic
@@ -958,25 +1005,45 @@ function BookService.AfterPlaced(self: BookService, player: Player, section, pla
 	end
 end
 
--- Zet alle gedragen boeken met deze code in de kast. Geeft het aantal terug.
-function BookService.PlaceMatching(self: BookService, player: Player, code: string, quiet: boolean?): number
+-- Zet alle gedragen boeken met deze code in de kast (serieboeken alleen op volgorde).
+-- Geeft terug hoeveel er geplaatst zijn en hoeveel serieboeken nog moeten wachten.
+function BookService.PlaceMatching(self: BookService, player: Player, code: string, quiet: boolean?): (number, number)
 	local list = self.Carried[player]
 	local section = self.Library.Sections[code]
 	if not list or not section then
-		return 0
+		return 0, 0
 	end
 	local placedNow = 0
-	for i = #list, 1, -1 do
-		if list[i].Code == code then
-			self:FillSlot(section, list[i])
-			table.remove(list, i)
-			placedNow += 1
+	-- Blijf rondgaan zolang er iets past (draag je deel 2 en 1 tegelijk, dan gaan ze allebei)
+	local progress = true
+	while progress do
+		progress = false
+		for i = #list, 1, -1 do
+			local book = list[i]
+			if book.Code == code and self:CanPlace(book) then
+				self:FillSlot(section, book)
+				table.remove(list, i)
+				placedNow += 1
+				progress = true
+			end
+		end
+	end
+	local waiting = 0
+	for _, book in list do
+		if book.Code == code then
+			waiting += 1
 		end
 	end
 	if placedNow > 0 then
 		self:AfterPlaced(player, section, placedNow, quiet)
 	end
-	return placedNow
+	return placedNow, waiting
+end
+
+-- Melding als een deel van een serie nog niet mag
+function BookService.NotifyWaiting(self: BookService, player: Player, code: string)
+	local nextVolume = (self.SeriesPlaced[code] or 0) + 1
+	notify(player, string.format("📚 Serie op volgorde! Zet eerst deel %d terug.", nextVolume), SERIES_GOLD)
 end
 
 function BookService.Place(self: BookService, player: Player, code: string)
@@ -994,8 +1061,13 @@ function BookService.Place(self: BookService, player: Player, code: string)
 	end
 
 	local character = player.Character
-	local placedNow = self:PlaceMatching(player, code)
-	if placedNow == 0 then
+	local placedNow, waiting = self:PlaceMatching(player, code)
+	if waiting > 0 then
+		self:NotifyWaiting(player, code)
+	end
+	if placedNow == 0 and waiting > 0 then
+		return
+	elseif placedNow == 0 then
 		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
 			playSound("Wrong", character)
@@ -1060,8 +1132,16 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 		codes[book.Code] = true
 	end
 	local total = 0
+	local waitingCode: string? = nil
 	for code in codes do
-		total += self:PlaceMatching(player, code, true)
+		local placed, waiting = self:PlaceMatching(player, code, true)
+		total += placed
+		if waiting > 0 then
+			waitingCode = code
+		end
+	end
+	if waitingCode then
+		self:NotifyWaiting(player, waitingCode)
 	end
 	if total > 0 then
 		if root then
@@ -1069,7 +1149,7 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 			-- Laat de boeken zichtbaar van je handen naar hun kast vliegen
 			for i, book in flying do
 				local section = self.Library.Sections[book.Code]
-				if section then
+				if section and not table.find(list, book) then
 					task.delay((i - 1) * 0.12, self.FlyVisual, self, book, root.Position + Vector3.new(0, 1, 0), section.Target.Position)
 				end
 			end
@@ -1115,7 +1195,8 @@ function BookService.AssistantPlace(self: BookService, player: Player): boolean
 	end
 	local candidates = {}
 	for _, p in self.Folder:GetChildren() do
-		if p:IsA("BasePart") and not p:GetAttribute("Flying") and self.BookData[p] then
+		local data = if p:IsA("BasePart") then self.BookData[p] else nil
+		if data and not p:GetAttribute("Flying") and self:CanPlace(data) then
 			table.insert(candidates, p)
 		end
 	end
@@ -1199,14 +1280,39 @@ function BookService.Clear(self: BookService)
 		self:Changed(player)
 	end
 	table.clear(self.PlacedPerSection)
+	table.clear(self.SeriesPlaced)
+	table.clear(self.NormalPlaced)
 	self.Placed = 0
 	self.State:SetAttribute("Placed", 0)
 	self.State:SetAttribute("Total", self.Total)
+	local seriesSize = self:SeriesSize()
 	for _, section in self.Library.Sections do
-		for _, slot in section.Slots do
+		for i, slot in section.Slots do
+			local isSeries = i <= seriesSize
 			slot.Transparency = 0.75
 			slot.Material = Enum.Material.Glass
-			slot.Color = Color3.fromRGB(255, 245, 225)
+			slot.Color = if isSeries then SERIES_GOLD else Color3.fromRGB(255, 245, 225)
+			-- De plekken van de serie krijgen een nummer: I, II, III
+			if isSeries and not slot:FindFirstChild("Volume") then
+				local gui = Instance.new("SurfaceGui")
+				gui.Name = "Volume"
+				gui.Face = Enum.NormalId.Back
+				gui.LightInfluence = 0
+				gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+				gui.PixelsPerStud = 60
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.Font = Enum.Font.Garamond
+				label.TextScaled = true
+				label.TextColor3 = SERIES_GOLD
+				label.Text = ROMAN[i] or tostring(i)
+				label.Parent = gui
+				local stroke = Instance.new("UIStroke")
+				stroke.Thickness = 2
+				stroke.Parent = label
+				gui.Parent = slot
+			end
 		end
 		self:UpdateSign(section)
 	end
@@ -1220,23 +1326,41 @@ function BookService.SpawnAll(self: BookService)
 	for i = 1, clusterCount do
 		clusters[i] = library:RandomBookSpot().Position
 	end
+	local seriesSize = self:SeriesSize()
 	for _, entry in Config.RoomSections(self.Room) do
 		local section = entry.Section
-		for i = 1, self.Room.BooksPerSection do
+		local books: { BookData } = {}
+		-- De serie: drie delen met dezelfde kleur, verspreid over de hele zaal
+		local seriesColor = BOOK_COLORS[math.random(1, #BOOK_COLORS)]
+		local seriesFont = BOOK_FONTS[math.random(1, #BOOK_FONTS)]
+		for volume = 1, seriesSize do
+			nextId += 1
+			table.insert(books, {
+				Id = nextId,
+				Code = section.Code,
+				Title = string.format("De %s-reeks · Deel %d", section.Name, volume),
+				Color = seriesColor,
+				Scale = 1.15,
+				Font = seriesFont,
+				Volume = volume,
+			})
+		end
+		for i = 1, self.Room.BooksPerSection - seriesSize do
 			nextId += 1
 			local title = section.Titles[(i - 1) % #section.Titles + 1]
 			if i > #section.Titles then
 				title ..= " " .. (math.floor((i - 1) / #section.Titles) + 1)
 			end
-			local scale = if math.random() < 0.15 then math.random(130, 165) / 100 else math.random(85, 120) / 100
-			local book: BookData = {
+			table.insert(books, {
 				Id = nextId,
 				Code = section.Code,
 				Title = title,
 				Color = BOOK_COLORS[math.random(1, #BOOK_COLORS)],
-				Scale = scale,
+				Scale = if math.random() < 0.15 then math.random(130, 165) / 100 else math.random(85, 120) / 100,
 				Font = BOOK_FONTS[math.random(1, #BOOK_FONTS)],
-			}
+			})
+		end
+		for _, book in books do
 			local center = clusters[math.random(1, #clusters)]
 			local spot = library:BookSpotNear(center, 7, self.Folder) or library:RandomBookSpot()
 			self:MakeLooseBook(book, spot)
@@ -1268,6 +1392,7 @@ export type Profile = {
 	Upgrades: { [string]: number }, -- winkel-upgrades en hun niveau
 	Magic: { [string]: boolean }, -- gekochte vaardigheden
 	Assistant: number, -- niveau van de assistent (0 = geen)
+	Ascend: { [string]: number }, -- hoogste Pro-niveau dat je per zaal hebt vrijgespeeld
 }
 
 local DataService = {}
@@ -1288,7 +1413,7 @@ do
 end
 
 local function defaultProfile(): Profile
-	return { Coins = 0, Keys = {}, BestTime = nil, Wins = 0, Upgrades = {}, Magic = {}, Assistant = 0 }
+	return { Coins = 0, Keys = {}, BestTime = nil, Wins = 0, Upgrades = {}, Magic = {}, Assistant = 0, Ascend = {} }
 end
 
 local function load(player: Player): Profile
@@ -1310,6 +1435,11 @@ local function load(player: Player): Profile
 			if type(data.Magic) == "table" then
 				for id, value in data.Magic do
 					profile.Magic[tostring(id)] = value == true
+				end
+			end
+			if type(data.Ascend) == "table" then
+				for id, value in data.Ascend do
+					profile.Ascend[tostring(id)] = tonumber(value) or 0
 				end
 			end
 			if type(data.Upgrades) == "table" then
@@ -1575,6 +1705,9 @@ local function applyUpgrades(player: Player)
 		player:SetAttribute("Magic_" .. info.Id, profile ~= nil and profile.Magic[info.Id] == true)
 	end
 	player:SetAttribute("Assistant", if profile then profile.Assistant else 0)
+	for _, room in Config.Rooms do
+		player:SetAttribute("Ascend_" .. room.Id, if profile then profile.Ascend[room.Id] or 0 else 0)
+	end
 
 	local capacity = Config.BaseCapacity + (upgrades.Capacity or 0)
 	if keys.Golden then
@@ -3453,6 +3586,7 @@ export type Monster = {
 	OnCatch: ((player: Player) -> ())?,
 	OnHiddenCatch: ((player: Player) -> ())?,
 	Progress: number, -- 0..1, hoe ver de spelers zijn
+	SpeedMultiplier: number, -- extra snelheid in Pro Mode
 	Spawn: () -> (),
 	Despawn: () -> (),
 	Noise: (position: Vector3, range: number) -> (),
@@ -3466,6 +3600,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		OnCatch = nil,
 		OnHiddenCatch = nil,
 		Progress = 0,
+		SpeedMultiplier = 1,
 	} :: any
 
 	local model: Model? = nil
@@ -3641,7 +3776,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		hum.MaxHealth = math.huge
 		hum.Health = math.huge
 		hum.BreakJointsOnDeath = false
-		hum.WalkSpeed = M.WanderSpeed * room.MonsterSpeed
+		hum.WalkSpeed = M.WanderSpeed * room.MonsterSpeed * self.SpeedMultiplier
 		hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 		hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
 		hum.Parent = m
@@ -3659,7 +3794,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 	end
 
 	local function chaseSpeed(): number
-		return (M.ChaseSpeedStart + (M.ChaseSpeedEnd - M.ChaseSpeedStart) * math.clamp(self.Progress, 0, 1)) * room.MonsterSpeed
+		return (M.ChaseSpeedStart + (M.ChaseSpeedEnd - M.ChaseSpeedStart) * math.clamp(self.Progress, 0, 1)) * room.MonsterSpeed * self.SpeedMultiplier
 	end
 
 	local function setGoal(position: Vector3)
@@ -3960,7 +4095,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		end
 
 		shushLabel.Text = ""
-		humanoid.WalkSpeed = M.WanderSpeed * room.MonsterSpeed
+		humanoid.WalkSpeed = M.WanderSpeed * room.MonsterSpeed * self.SpeedMultiplier
 
 		if state == "Investigate" then
 			if not goal then
@@ -4076,6 +4211,8 @@ type Room = {
 	Finished: boolean,
 	RoundRunning: boolean,
 	TimeLeft: number,
+	Level: number, -- 0 = normaal, 1..5 = Pro Mode
+	CoinMultiplier: number,
 }
 
 -- Een soort zaal met zijn deur in de hal
@@ -4255,7 +4392,7 @@ local function playRound(room: Room)
 	local elapsed = 0
 	if not aborted then
 		room.Books:SpawnAll()
-		setState(room, "Playing", "Ruim samen alle kasten op!")
+		setState(room, "Playing", if room.Level > 0 then "⭐ Pro " .. room.Level .. " · Ruim samen alle kasten op!" else "Ruim samen alle kasten op!")
 		local count = #roomPlayers(room)
 		for _, player in roomPlayers(room) do
 			notify(
@@ -4264,7 +4401,9 @@ local function playRound(room: Room)
 				Color3.fromRGB(255, 220, 150)
 			)
 		end
-		local timeLeft = info.RoundTime
+		local timeFactor = math.max(Config.Pro.MinTimeFactor, 1 - Config.Pro.TimePerLevel * room.Level)
+		local timeLeft = math.floor(info.RoundTime * timeFactor)
+		local useMonster = info.Monster or room.Level > 0
 		local monsterSpawned = false
 		while timeLeft > 0 and not room.Finished do
 			if isEmpty(room) then
@@ -4277,7 +4416,7 @@ local function playRound(room: Room)
 			timeLeft -= 1
 			elapsed += 1
 			local monster = room.Monster
-			if monster then
+			if monster and useMonster then
 				monster.Progress = room.Books.Placed / room.Books.Total
 				if not monsterSpawned and elapsed >= Config.Monster.SpawnDelay then
 					monsterSpawned = true
@@ -4300,13 +4439,21 @@ local function playRound(room: Room)
 	room.State:SetAttribute("Results", results(room))
 	if room.Finished then
 		setState(room, "Won", "DE ZAAL IS SCHOON! Tijd: " .. formatTime(elapsed))
-		local reward = math.floor(Config.CoinsForWin * info.CoinMultiplier)
+		local reward = math.floor(Config.CoinsForWin * room.CoinMultiplier)
 		for _, player in roomPlayers(room) do
 			DataService.AddCoins(player, reward)
 			notify(player, "+" .. reward .. " munten!", Color3.fromRGB(255, 215, 0))
 			local profile = DataService.Get(player)
 			if profile then
 				profile.Wins += 1
+				-- Pro Mode: het volgende niveau van deze zaal gaat open
+				local unlocked = profile.Ascend[info.Id] or 0
+				local nextLevel = math.min(room.Level + 1, Config.Pro.MaxLevel)
+				if nextLevel > unlocked then
+					profile.Ascend[info.Id] = nextLevel
+					KeyService.Refresh(player)
+					notify(player, string.format("⭐ Pro %d van de %s is vrijgespeeld!", nextLevel, info.Name), Color3.fromRGB(255, 215, 0))
+				end
 				if not profile.BestTime or elapsed < profile.BestTime then
 					profile.BestTime = elapsed
 				end
@@ -4369,18 +4516,21 @@ local function createCopy(roomType: RoomType): Room
 		Finished = false,
 		RoundRunning = false,
 		TimeLeft = 0,
+		Level = 0,
+		CoinMultiplier = info.CoinMultiplier,
 	}
 
 	room.Books.OnAllPlaced = function()
 		room.Finished = true
 	end
 	room.Books.OnBookPlaced = function(player, count)
-		DataService.AddCoins(player, math.max(1, math.floor(count * Config.CoinsPerBook * info.CoinMultiplier + 0.5)))
+		DataService.AddCoins(player, math.max(1, math.floor(count * Config.CoinsPerBook * room.CoinMultiplier + 0.5)))
 		DataService.SetRoundBooks(player, DataService.GetRoundBooks(player) + count)
 		room.Contributions[player] = (room.Contributions[player] or 0) + count
 	end
 
-	if info.Monster then
+	-- Elke zaal krijgt een monster; in de Starterzaal komt ze alleen in Pro Mode tevoorschijn
+	do
 		local monster = MonsterService.new(info, library, function()
 			return roomPlayers(room)
 		end)
@@ -4447,12 +4597,28 @@ local function inZone(player: Player, zone: BasePart): boolean
 	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= zone.Size.X / 2 + 1 and math.abs(offset.Y) < zone.Size.Y
 end
 
+-- Zet het niveau (normaal of Pro) voor een nieuwe ronde
+local function setLevel(room: Room, level: number)
+	room.Level = level
+	room.CoinMultiplier = room.Info.CoinMultiplier * (1 + Config.Pro.CoinBonusPerLevel * level)
+	room.State:SetAttribute("Level", level)
+	if room.Monster then
+		room.Monster.SpeedMultiplier = 1 + Config.Pro.MonsterSpeedPerLevel * level
+	end
+end
+
 -- Stuurt een groep spelers samen naar binnen. Geeft false terug als alles bezet is.
-local function sendGroup(roomType: RoomType, group: { Player }): boolean
+local function sendGroup(roomType: RoomType, group: { Player }, level: number?): boolean
 	if #group == 0 then
 		return true
 	end
-	local room = copyWithFriend(roomType, group) or freeCopy(roomType)
+	local room = copyWithFriend(roomType, group)
+	if not room then
+		room = freeCopy(roomType)
+		if room then
+			setLevel(room, level or 0)
+		end
+	end
 	if not room then
 		for _, player in group do
 			notify(player, "Alle " .. roomType.Info.Name .. "s zijn bezet. Nog even wachten...", Color3.fromRGB(255, 200, 120))
@@ -4486,13 +4652,21 @@ local function launch(roomType: RoomType): boolean
 	return sendGroup(roomType, group)
 end
 
--- Gekozen in het menu: meteen naar binnen (bij een vriend als die al speelt)
-function RoomService.PlayNow(player: Player, typeId: string)
+-- Gekozen in het menu: meteen naar binnen (bij een vriend als die al speelt).
+-- `level` > 0 is Pro Mode; dat mag alleen als je dat niveau hebt vrijgespeeld.
+function RoomService.PlayNow(player: Player, typeId: string, level: number?)
 	local roomType = types[typeId]
 	if not roomType or playerRoom[player] then
 		return
 	end
-	sendGroup(roomType, { player })
+	local wanted = math.floor(tonumber(level) or 0)
+	local profile = DataService.Get(player)
+	local unlocked = if profile then profile.Ascend[typeId] or 0 else 0
+	if wanted > unlocked then
+		notify(player, "Win eerst de " .. roomType.Info.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+		return
+	end
+	sendGroup(roomType, { player }, math.clamp(wanted, 0, Config.Pro.MaxLevel))
 end
 
 local function queueLoop()
@@ -4564,9 +4738,9 @@ function RoomService.Init(lobbyData)
 			RoomService.Leave(player, true)
 		end
 	end)
-	Remotes.Action.OnServerEvent:Connect(function(player, action, typeId)
+	Remotes.Action.OnServerEvent:Connect(function(player, action, typeId, level)
 		if action == "PlayRoom" and type(typeId) == "string" then
-			RoomService.PlayNow(player, typeId)
+			RoomService.PlayNow(player, typeId, if type(level) == "number" then level else 0)
 		end
 	end)
 
@@ -6114,7 +6288,7 @@ local function buildRoomChooser()
 		Name = "RoomChooser",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(40 + count * 210, 420),
+		Size = UDim2.fromOffset(40 + count * 210, 480),
 		BackgroundColor3 = NAVY,
 		Visible = false,
 		ZIndex = 25,
@@ -6123,7 +6297,7 @@ local function buildRoomChooser()
 	local uiScale = make("UIScale", { Parent = chooser })
 	local function fit()
 		local view = Workspace.CurrentCamera.ViewportSize
-		uiScale.Scale = math.clamp(math.min((view.X - 20) / (40 + count * 210), (view.Y - 20) / 420), 0.45, 1)
+		uiScale.Scale = math.clamp(math.min((view.X - 20) / (40 + count * 210), (view.Y - 20) / 480), 0.45, 1)
 	end
 	fit()
 	Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
@@ -6158,7 +6332,7 @@ local function buildRoomChooser()
 	for i, room in Config.Rooms do
 		local card = make("Frame", {
 			Position = UDim2.fromOffset(20 + (i - 1) * 210, 72),
-			Size = UDim2.fromOffset(196, 280),
+			Size = UDim2.fromOffset(196, 340),
 			BackgroundColor3 = NAVY_DARK,
 			ZIndex = 26,
 			Parent = chooser,
@@ -6200,7 +6374,7 @@ local function buildRoomChooser()
 		})
 		local play = make("TextButton", {
 			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -14),
+			Position = UDim2.new(0.5, 0, 1, -72),
 			Size = UDim2.new(1, -28, 0, 50),
 			BackgroundColor3 = Color3.fromRGB(46, 150, 80),
 			Font = ROUND,
@@ -6214,7 +6388,44 @@ local function buildRoomChooser()
 		stroke(play, Color3.fromRGB(150, 240, 170), 2)
 		play.Activated:Connect(function()
 			chooser.Visible = false
-			Remotes.Action:FireServer("PlayRoom", room.Id)
+			Remotes.Action:FireServer("PlayRoom", room.Id, 0)
+		end)
+
+		-- Pro Mode: speel het hoogste niveau dat je hebt vrijgespeeld
+		local pro = make("TextButton", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -14),
+			Size = UDim2.new(1, -28, 0, 50),
+			BackgroundColor3 = Color3.fromRGB(70, 76, 96),
+			Font = ROUND,
+			TextSize = 20,
+			TextColor3 = WHITE,
+			Text = "",
+			ZIndex = 27,
+			Parent = card,
+		})
+		corner(pro, 10)
+		stroke(pro, GOLD, 2)
+		local function refreshPro()
+			local level = player:GetAttribute("Ascend_" .. room.Id) or 0
+			if level > 0 then
+				pro.Text = "⭐ Pro " .. level
+				pro.BackgroundColor3 = Color3.fromRGB(190, 130, 30)
+			else
+				pro.Text = "🔒 Pro: win eerst"
+				pro.BackgroundColor3 = Color3.fromRGB(70, 76, 96)
+			end
+		end
+		refreshPro()
+		player:GetAttributeChangedSignal("Ascend_" .. room.Id):Connect(refreshPro)
+		pro.Activated:Connect(function()
+			local level = player:GetAttribute("Ascend_" .. room.Id) or 0
+			if level <= 0 then
+				Hud.Notify("Win eerst de " .. room.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+				return
+			end
+			chooser.Visible = false
+			Remotes.Action:FireServer("PlayRoom", room.Id, level)
 		end)
 	end
 	make("TextLabel", {
@@ -6428,7 +6639,7 @@ function Hud.SetInventory(list: { any }, capacity: number)
 			Font = Enum.Font.GothamBold,
 			TextSize = 14,
 			TextColor3 = WHITE,
-			Text = string.format("%s  %s", book.Code, if section then section.Name else ""),
+			Text = string.format("%s  %s%s", book.Code, if section then section.Name else "", if book.Volume then " · deel " .. book.Volume else ""),
 			Parent = chip,
 		})
 	end
@@ -6627,6 +6838,8 @@ local function updateRound()
 	local total = roomState:GetAttribute("Total") or 0
 	local message = roomState:GetAttribute("Message") or ""
 	local playerCount = roomState:GetAttribute("Players") or 1
+	local level = roomState:GetAttribute("Level") or 0
+	local proText = if level > 0 then "⭐ Pro " .. level .. " · " else ""
 
 	timerLabel.Text = formatTime(timeLeft)
 	timerLabel.TextColor3 = if state == "Playing" and timeLeft <= 60 then Color3.fromRGB(255, 90, 90) else WHITE
@@ -6635,7 +6848,7 @@ local function updateRound()
 	if state == "Playing" then
 		local left = total - placed
 		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
-		objectiveLabel.Text = if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op"
+		objectiveLabel.Text = proText .. (if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op")
 	elseif state == "Starting" then
 		sectionsLeftLabel.Text = "de zaal gaat zo open..."
 		objectiveLabel.Text = message

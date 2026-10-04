@@ -15,7 +15,11 @@ export type BookData = {
 	Color: Color3,
 	Scale: number,
 	Font: Enum.Font,
+	Volume: number?, -- deel van een serie (1, 2, 3), of nil voor een los boek
 }
+
+local ROMAN = { "I", "II", "III", "IV", "V" }
+local SERIES_GOLD = Color3.fromRGB(255, 214, 110)
 
 local BOOK_COLORS = {
 	Color3.fromRGB(196, 52, 48),
@@ -132,7 +136,13 @@ local function buildBookParts(book: BookData, scale: number): BasePart
 	code.TextScaled = true
 	code.Font = Enum.Font.GothamBlack
 	code.TextColor3 = title.TextColor3
-	code.Text = book.Code
+	code.Text = if book.Volume then book.Code .. " · " .. (ROMAN[book.Volume] or tostring(book.Volume)) else book.Code
+	if book.Volume then
+		-- Serieboeken hebben een extra brede gouden band en een gouden rug
+		code.TextColor3 = SERIES_GOLD
+		band.Size = UDim2.new(1, 0, 0.14, 0)
+		band2.Size = UDim2.new(1, 0, 0.14, 0)
+	end
 	code.Parent = spine
 
 	cover:SetAttribute("IsBook", true)
@@ -202,6 +212,8 @@ export type BookService = typeof(setmetatable(
 		Active: boolean,
 		Carried: { [Player]: { BookData } },
 		PlacedPerSection: { [string]: number },
+		SeriesPlaced: { [string]: number },
+		NormalPlaced: { [string]: number },
 		BookData: { [BasePart]: BookData },
 		OnAllPlaced: (() -> ())?,
 		OnMistake: ((player: Player, position: Vector3) -> ())?,
@@ -221,6 +233,8 @@ function BookService.new(room: Config.RoomInfo, library, state: Instance): BookS
 		Active = false, -- alleen tijdens een ronde kun je boeken pakken
 		Carried = {},
 		PlacedPerSection = {},
+		SeriesPlaced = {},
+		NormalPlaced = {},
 		BookData = {},
 		OnAllPlaced = nil,
 		OnMistake = nil,
@@ -254,7 +268,7 @@ function BookService.Changed(self: BookService, player: Player)
 	updateCarryVisual(player, books)
 	local list = {}
 	for _, book in books do
-		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color })
+		table.insert(list, { Code = book.Code, Title = book.Title, Color = book.Color, Volume = book.Volume })
 	end
 	Remotes.Inventory:FireClient(player, list, getCapacity(player))
 end
@@ -276,7 +290,9 @@ function BookService.MakeLooseBook(self: BookService, book: BookData, surface: C
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Oppakken"
-	prompt.ObjectText = string.format("[%s] %s", book.Code, book.Title)
+	prompt.ObjectText = if book.Volume
+		then string.format("[%s] %s (deel %d van %d)", book.Code, book.Title, book.Volume, Config.SeriesLength)
+		else string.format("[%s] %s", book.Code, book.Title)
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 9
 	prompt.RequiresLineOfSight = false
@@ -332,10 +348,29 @@ function BookService.UpdateSign(self: BookService, section)
 	end
 end
 
--- Zet één boek op de volgende lege plek in de kast
+-- Hoeveel boeken per kast bij de serie horen (0 als er te weinig boeken zijn)
+function BookService.SeriesSize(self: BookService): number
+	return if self.Room.BooksPerSection >= Config.SeriesLength * 2 then Config.SeriesLength else 0
+end
+
+-- Mag dit boek nu al in de kast? Serieboeken moeten op volgorde: eerst deel 1, dan 2, dan 3.
+function BookService.CanPlace(self: BookService, book: BookData): boolean
+	return book.Volume == nil or (self.SeriesPlaced[book.Code] or 0) == book.Volume - 1
+end
+
+-- Zet één boek op zijn plek in de kast. De serie staat vooraan, de losse boeken daarna.
 function BookService.FillSlot(self: BookService, section, book: BookData)
 	local count = (self.PlacedPerSection[section.Code] or 0) + 1
-	local slot = section.Slots[count]
+	local slotIndex
+	if book.Volume then
+		slotIndex = book.Volume
+		self.SeriesPlaced[section.Code] = book.Volume
+	else
+		local normal = (self.NormalPlaced[section.Code] or 0) + 1
+		self.NormalPlaced[section.Code] = normal
+		slotIndex = self:SeriesSize() + normal
+	end
+	local slot = section.Slots[slotIndex]
 	if slot then
 		slot.Transparency = 0
 		slot.Material = Enum.Material.SmoothPlastic
@@ -364,25 +399,45 @@ function BookService.AfterPlaced(self: BookService, player: Player, section, pla
 	end
 end
 
--- Zet alle gedragen boeken met deze code in de kast. Geeft het aantal terug.
-function BookService.PlaceMatching(self: BookService, player: Player, code: string, quiet: boolean?): number
+-- Zet alle gedragen boeken met deze code in de kast (serieboeken alleen op volgorde).
+-- Geeft terug hoeveel er geplaatst zijn en hoeveel serieboeken nog moeten wachten.
+function BookService.PlaceMatching(self: BookService, player: Player, code: string, quiet: boolean?): (number, number)
 	local list = self.Carried[player]
 	local section = self.Library.Sections[code]
 	if not list or not section then
-		return 0
+		return 0, 0
 	end
 	local placedNow = 0
-	for i = #list, 1, -1 do
-		if list[i].Code == code then
-			self:FillSlot(section, list[i])
-			table.remove(list, i)
-			placedNow += 1
+	-- Blijf rondgaan zolang er iets past (draag je deel 2 en 1 tegelijk, dan gaan ze allebei)
+	local progress = true
+	while progress do
+		progress = false
+		for i = #list, 1, -1 do
+			local book = list[i]
+			if book.Code == code and self:CanPlace(book) then
+				self:FillSlot(section, book)
+				table.remove(list, i)
+				placedNow += 1
+				progress = true
+			end
+		end
+	end
+	local waiting = 0
+	for _, book in list do
+		if book.Code == code then
+			waiting += 1
 		end
 	end
 	if placedNow > 0 then
 		self:AfterPlaced(player, section, placedNow, quiet)
 	end
-	return placedNow
+	return placedNow, waiting
+end
+
+-- Melding als een deel van een serie nog niet mag
+function BookService.NotifyWaiting(self: BookService, player: Player, code: string)
+	local nextVolume = (self.SeriesPlaced[code] or 0) + 1
+	notify(player, string.format("📚 Serie op volgorde! Zet eerst deel %d terug.", nextVolume), SERIES_GOLD)
 end
 
 function BookService.Place(self: BookService, player: Player, code: string)
@@ -400,8 +455,13 @@ function BookService.Place(self: BookService, player: Player, code: string)
 	end
 
 	local character = player.Character
-	local placedNow = self:PlaceMatching(player, code)
-	if placedNow == 0 then
+	local placedNow, waiting = self:PlaceMatching(player, code)
+	if waiting > 0 then
+		self:NotifyWaiting(player, code)
+	end
+	if placedNow == 0 and waiting > 0 then
+		return
+	elseif placedNow == 0 then
 		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
 			playSound("Wrong", character)
@@ -466,8 +526,16 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 		codes[book.Code] = true
 	end
 	local total = 0
+	local waitingCode: string? = nil
 	for code in codes do
-		total += self:PlaceMatching(player, code, true)
+		local placed, waiting = self:PlaceMatching(player, code, true)
+		total += placed
+		if waiting > 0 then
+			waitingCode = code
+		end
+	end
+	if waitingCode then
+		self:NotifyWaiting(player, waitingCode)
 	end
 	if total > 0 then
 		if root then
@@ -475,7 +543,7 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 			-- Laat de boeken zichtbaar van je handen naar hun kast vliegen
 			for i, book in flying do
 				local section = self.Library.Sections[book.Code]
-				if section then
+				if section and not table.find(list, book) then
 					task.delay((i - 1) * 0.12, self.FlyVisual, self, book, root.Position + Vector3.new(0, 1, 0), section.Target.Position)
 				end
 			end
@@ -521,7 +589,8 @@ function BookService.AssistantPlace(self: BookService, player: Player): boolean
 	end
 	local candidates = {}
 	for _, p in self.Folder:GetChildren() do
-		if p:IsA("BasePart") and not p:GetAttribute("Flying") and self.BookData[p] then
+		local data = if p:IsA("BasePart") then self.BookData[p] else nil
+		if data and not p:GetAttribute("Flying") and self:CanPlace(data) then
 			table.insert(candidates, p)
 		end
 	end
@@ -605,14 +674,39 @@ function BookService.Clear(self: BookService)
 		self:Changed(player)
 	end
 	table.clear(self.PlacedPerSection)
+	table.clear(self.SeriesPlaced)
+	table.clear(self.NormalPlaced)
 	self.Placed = 0
 	self.State:SetAttribute("Placed", 0)
 	self.State:SetAttribute("Total", self.Total)
+	local seriesSize = self:SeriesSize()
 	for _, section in self.Library.Sections do
-		for _, slot in section.Slots do
+		for i, slot in section.Slots do
+			local isSeries = i <= seriesSize
 			slot.Transparency = 0.75
 			slot.Material = Enum.Material.Glass
-			slot.Color = Color3.fromRGB(255, 245, 225)
+			slot.Color = if isSeries then SERIES_GOLD else Color3.fromRGB(255, 245, 225)
+			-- De plekken van de serie krijgen een nummer: I, II, III
+			if isSeries and not slot:FindFirstChild("Volume") then
+				local gui = Instance.new("SurfaceGui")
+				gui.Name = "Volume"
+				gui.Face = Enum.NormalId.Back
+				gui.LightInfluence = 0
+				gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+				gui.PixelsPerStud = 60
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.Font = Enum.Font.Garamond
+				label.TextScaled = true
+				label.TextColor3 = SERIES_GOLD
+				label.Text = ROMAN[i] or tostring(i)
+				label.Parent = gui
+				local stroke = Instance.new("UIStroke")
+				stroke.Thickness = 2
+				stroke.Parent = label
+				gui.Parent = slot
+			end
 		end
 		self:UpdateSign(section)
 	end
@@ -626,23 +720,41 @@ function BookService.SpawnAll(self: BookService)
 	for i = 1, clusterCount do
 		clusters[i] = library:RandomBookSpot().Position
 	end
+	local seriesSize = self:SeriesSize()
 	for _, entry in Config.RoomSections(self.Room) do
 		local section = entry.Section
-		for i = 1, self.Room.BooksPerSection do
+		local books: { BookData } = {}
+		-- De serie: drie delen met dezelfde kleur, verspreid over de hele zaal
+		local seriesColor = BOOK_COLORS[math.random(1, #BOOK_COLORS)]
+		local seriesFont = BOOK_FONTS[math.random(1, #BOOK_FONTS)]
+		for volume = 1, seriesSize do
+			nextId += 1
+			table.insert(books, {
+				Id = nextId,
+				Code = section.Code,
+				Title = string.format("De %s-reeks · Deel %d", section.Name, volume),
+				Color = seriesColor,
+				Scale = 1.15,
+				Font = seriesFont,
+				Volume = volume,
+			})
+		end
+		for i = 1, self.Room.BooksPerSection - seriesSize do
 			nextId += 1
 			local title = section.Titles[(i - 1) % #section.Titles + 1]
 			if i > #section.Titles then
 				title ..= " " .. (math.floor((i - 1) / #section.Titles) + 1)
 			end
-			local scale = if math.random() < 0.15 then math.random(130, 165) / 100 else math.random(85, 120) / 100
-			local book: BookData = {
+			table.insert(books, {
 				Id = nextId,
 				Code = section.Code,
 				Title = title,
 				Color = BOOK_COLORS[math.random(1, #BOOK_COLORS)],
-				Scale = scale,
+				Scale = if math.random() < 0.15 then math.random(130, 165) / 100 else math.random(85, 120) / 100,
 				Font = BOOK_FONTS[math.random(1, #BOOK_FONTS)],
-			}
+			})
+		end
+		for _, book in books do
 			local center = clusters[math.random(1, #clusters)]
 			local spot = library:BookSpotNear(center, 7, self.Folder) or library:RandomBookSpot()
 			self:MakeLooseBook(book, spot)

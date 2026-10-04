@@ -41,6 +41,18 @@ Config.StartCountdown = 5 -- seconden tussen binnenkomen en de start
 Config.QueueTime = 10 -- zo lang telt de ring af voordat de groep naar binnen gaat
 Config.MaxGroupSize = 8 -- zoveel spelers kunnen samen in één zaal
 Config.MaxCopiesPerRoom = 4 -- zoveel groepen kunnen tegelijk dezelfde soort zaal spelen
+
+-- Boekenseries: in elke kast hoort een serie (deel 1, 2, 3) die in de goede volgorde terug moet
+Config.SeriesLength = 3
+
+-- Pro Mode (Ascend): win een zaal en speel hem opnieuw op een hoger niveau
+Config.Pro = {
+	MaxLevel = 5,
+	TimePerLevel = 0.12, -- elk niveau 12% minder tijd
+	MinTimeFactor = 0.4,
+	MonsterSpeedPerLevel = 0.08, -- elk niveau 8% sneller monster (ook in de Starterzaal komt er een)
+	CoinBonusPerLevel = 0.5, -- elk niveau +50% munten
+}
 Config.CopySpacing = Vector3.new(0, 0, 400) -- afstand tussen kopieën van een zaal
 Config.EndScreenTime = 8 -- daarna ga je terug naar de hal
 Config.RespawnTime = 4

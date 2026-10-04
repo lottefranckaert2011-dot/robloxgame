@@ -15,6 +15,7 @@ export type Monster = {
 	OnCatch: ((player: Player) -> ())?,
 	OnHiddenCatch: ((player: Player) -> ())?,
 	Progress: number, -- 0..1, hoe ver de spelers zijn
+	SpeedMultiplier: number, -- extra snelheid in Pro Mode
 	Spawn: () -> (),
 	Despawn: () -> (),
 	Noise: (position: Vector3, range: number) -> (),
@@ -28,6 +29,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		OnCatch = nil,
 		OnHiddenCatch = nil,
 		Progress = 0,
+		SpeedMultiplier = 1,
 	} :: any
 
 	local model: Model? = nil
@@ -203,7 +205,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		hum.MaxHealth = math.huge
 		hum.Health = math.huge
 		hum.BreakJointsOnDeath = false
-		hum.WalkSpeed = M.WanderSpeed * room.MonsterSpeed
+		hum.WalkSpeed = M.WanderSpeed * room.MonsterSpeed * self.SpeedMultiplier
 		hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 		hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
 		hum.Parent = m
@@ -221,7 +223,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 	end
 
 	local function chaseSpeed(): number
-		return (M.ChaseSpeedStart + (M.ChaseSpeedEnd - M.ChaseSpeedStart) * math.clamp(self.Progress, 0, 1)) * room.MonsterSpeed
+		return (M.ChaseSpeedStart + (M.ChaseSpeedEnd - M.ChaseSpeedStart) * math.clamp(self.Progress, 0, 1)) * room.MonsterSpeed * self.SpeedMultiplier
 	end
 
 	local function setGoal(position: Vector3)
@@ -522,7 +524,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		end
 
 		shushLabel.Text = ""
-		humanoid.WalkSpeed = M.WanderSpeed * room.MonsterSpeed
+		humanoid.WalkSpeed = M.WanderSpeed * room.MonsterSpeed * self.SpeedMultiplier
 
 		if state == "Investigate" then
 			if not goal then

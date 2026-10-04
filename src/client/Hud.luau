@@ -750,7 +750,7 @@ local function buildRoomChooser()
 		Name = "RoomChooser",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(40 + count * 210, 420),
+		Size = UDim2.fromOffset(40 + count * 210, 480),
 		BackgroundColor3 = NAVY,
 		Visible = false,
 		ZIndex = 25,
@@ -759,7 +759,7 @@ local function buildRoomChooser()
 	local uiScale = make("UIScale", { Parent = chooser })
 	local function fit()
 		local view = Workspace.CurrentCamera.ViewportSize
-		uiScale.Scale = math.clamp(math.min((view.X - 20) / (40 + count * 210), (view.Y - 20) / 420), 0.45, 1)
+		uiScale.Scale = math.clamp(math.min((view.X - 20) / (40 + count * 210), (view.Y - 20) / 480), 0.45, 1)
 	end
 	fit()
 	Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
@@ -794,7 +794,7 @@ local function buildRoomChooser()
 	for i, room in Config.Rooms do
 		local card = make("Frame", {
 			Position = UDim2.fromOffset(20 + (i - 1) * 210, 72),
-			Size = UDim2.fromOffset(196, 280),
+			Size = UDim2.fromOffset(196, 340),
 			BackgroundColor3 = NAVY_DARK,
 			ZIndex = 26,
 			Parent = chooser,
@@ -836,7 +836,7 @@ local function buildRoomChooser()
 		})
 		local play = make("TextButton", {
 			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -14),
+			Position = UDim2.new(0.5, 0, 1, -72),
 			Size = UDim2.new(1, -28, 0, 50),
 			BackgroundColor3 = Color3.fromRGB(46, 150, 80),
 			Font = ROUND,
@@ -850,7 +850,44 @@ local function buildRoomChooser()
 		stroke(play, Color3.fromRGB(150, 240, 170), 2)
 		play.Activated:Connect(function()
 			chooser.Visible = false
-			Remotes.Action:FireServer("PlayRoom", room.Id)
+			Remotes.Action:FireServer("PlayRoom", room.Id, 0)
+		end)
+
+		-- Pro Mode: speel het hoogste niveau dat je hebt vrijgespeeld
+		local pro = make("TextButton", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -14),
+			Size = UDim2.new(1, -28, 0, 50),
+			BackgroundColor3 = Color3.fromRGB(70, 76, 96),
+			Font = ROUND,
+			TextSize = 20,
+			TextColor3 = WHITE,
+			Text = "",
+			ZIndex = 27,
+			Parent = card,
+		})
+		corner(pro, 10)
+		stroke(pro, GOLD, 2)
+		local function refreshPro()
+			local level = player:GetAttribute("Ascend_" .. room.Id) or 0
+			if level > 0 then
+				pro.Text = "⭐ Pro " .. level
+				pro.BackgroundColor3 = Color3.fromRGB(190, 130, 30)
+			else
+				pro.Text = "🔒 Pro: win eerst"
+				pro.BackgroundColor3 = Color3.fromRGB(70, 76, 96)
+			end
+		end
+		refreshPro()
+		player:GetAttributeChangedSignal("Ascend_" .. room.Id):Connect(refreshPro)
+		pro.Activated:Connect(function()
+			local level = player:GetAttribute("Ascend_" .. room.Id) or 0
+			if level <= 0 then
+				Hud.Notify("Win eerst de " .. room.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+				return
+			end
+			chooser.Visible = false
+			Remotes.Action:FireServer("PlayRoom", room.Id, level)
 		end)
 	end
 	make("TextLabel", {
@@ -1064,7 +1101,7 @@ function Hud.SetInventory(list: { any }, capacity: number)
 			Font = Enum.Font.GothamBold,
 			TextSize = 14,
 			TextColor3 = WHITE,
-			Text = string.format("%s  %s", book.Code, if section then section.Name else ""),
+			Text = string.format("%s  %s%s", book.Code, if section then section.Name else "", if book.Volume then " · deel " .. book.Volume else ""),
 			Parent = chip,
 		})
 	end
@@ -1263,6 +1300,8 @@ local function updateRound()
 	local total = roomState:GetAttribute("Total") or 0
 	local message = roomState:GetAttribute("Message") or ""
 	local playerCount = roomState:GetAttribute("Players") or 1
+	local level = roomState:GetAttribute("Level") or 0
+	local proText = if level > 0 then "⭐ Pro " .. level .. " · " else ""
 
 	timerLabel.Text = formatTime(timeLeft)
 	timerLabel.TextColor3 = if state == "Playing" and timeLeft <= 60 then Color3.fromRGB(255, 90, 90) else WHITE
@@ -1271,7 +1310,7 @@ local function updateRound()
 	if state == "Playing" then
 		local left = total - placed
 		sectionsLeftLabel.Text = string.format("nog %d boek%s te gaan", left, if left == 1 then "" else "en")
-		objectiveLabel.Text = if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op"
+		objectiveLabel.Text = proText .. (if playerCount > 1 then string.format("Samen opruimen · 👥 %d", playerCount) else "Ruim alle kasten op")
 	elseif state == "Starting" then
 		sectionsLeftLabel.Text = "de zaal gaat zo open..."
 		objectiveLabel.Text = message

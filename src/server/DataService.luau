@@ -14,6 +14,7 @@ export type Profile = {
 	Upgrades: { [string]: number }, -- winkel-upgrades en hun niveau
 	Magic: { [string]: boolean }, -- gekochte vaardigheden
 	Assistant: number, -- niveau van de assistent (0 = geen)
+	Ascend: { [string]: number }, -- hoogste Pro-niveau dat je per zaal hebt vrijgespeeld
 }
 
 local DataService = {}
@@ -34,7 +35,7 @@ do
 end
 
 local function defaultProfile(): Profile
-	return { Coins = 0, Keys = {}, BestTime = nil, Wins = 0, Upgrades = {}, Magic = {}, Assistant = 0 }
+	return { Coins = 0, Keys = {}, BestTime = nil, Wins = 0, Upgrades = {}, Magic = {}, Assistant = 0, Ascend = {} }
 end
 
 local function load(player: Player): Profile
@@ -56,6 +57,11 @@ local function load(player: Player): Profile
 			if type(data.Magic) == "table" then
 				for id, value in data.Magic do
 					profile.Magic[tostring(id)] = value == true
+				end
+			end
+			if type(data.Ascend) == "table" then
+				for id, value in data.Ascend do
+					profile.Ascend[tostring(id)] = tonumber(value) or 0
 				end
 			end
 			if type(data.Upgrades) == "table" then

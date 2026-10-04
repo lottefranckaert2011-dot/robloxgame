@@ -69,6 +69,22 @@ Op een telefoon of tablet tik je gewoon op de knoppen in beeld.
 - Ruim je alle boeken op voordat de tijd om is, dan win je extra munten.
 - Rechtsonder zie je hoeveel boeken er terug staan (📚) en hoeveel je draagt (📖).
 
+### Boekenseries
+
+In elke kast hoort een **serie van 3 delen** (bijv. *De Horror-reeks · Deel 1, 2 en 3*). Je herkent ze aan de brede
+gouden band en de gouden code met I, II of III op de rug. Ze moeten **op volgorde** terug: deel 2 pas als deel 1 staat,
+en deel 3 als laatste. De lege plekken voor de serie zijn goudkleurig en hebben een nummer. Draag je deel 1 en 2 tegelijk,
+dan zet je ze in één keer terug.
+
+### Pro Mode (Ascend)
+
+Win je een zaal, dan speel je **⭐ Pro 1** van die zaal vrij. Win je Pro 1, dan gaat Pro 2 open, en zo verder tot Pro 5.
+Kies Pro in het keuzemenu met de gouden knop onder **▶ Spelen**. Elk Pro-niveau geeft:
+
+- 12% minder tijd;
+- een 8% sneller monster (ook in de Starterzaal komt De Bibliothecaresse dan tevoorschijn);
+- 50% meer munten.
+
 ### Munten uitgeven
 
 - **Winkel (F)**: *Grotere Tas* (meer boeken dragen) en *Snelle Schoenen* (sneller lopen).

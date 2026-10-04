@@ -31,6 +31,9 @@ local function applyUpgrades(player: Player)
 		player:SetAttribute("Magic_" .. info.Id, profile ~= nil and profile.Magic[info.Id] == true)
 	end
 	player:SetAttribute("Assistant", if profile then profile.Assistant else 0)
+	for _, room in Config.Rooms do
+		player:SetAttribute("Ascend_" .. room.Id, if profile then profile.Ascend[room.Id] or 0 else 0)
+	end
 
 	local capacity = Config.BaseCapacity + (upgrades.Capacity or 0)
 	if keys.Golden then

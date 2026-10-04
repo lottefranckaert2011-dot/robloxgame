@@ -35,6 +35,8 @@ type Room = {
 	Finished: boolean,
 	RoundRunning: boolean,
 	TimeLeft: number,
+	Level: number, -- 0 = normaal, 1..5 = Pro Mode
+	CoinMultiplier: number,
 }
 
 -- Een soort zaal met zijn deur in de hal
@@ -214,7 +216,7 @@ local function playRound(room: Room)
 	local elapsed = 0
 	if not aborted then
 		room.Books:SpawnAll()
-		setState(room, "Playing", "Ruim samen alle kasten op!")
+		setState(room, "Playing", if room.Level > 0 then "⭐ Pro " .. room.Level .. " · Ruim samen alle kasten op!" else "Ruim samen alle kasten op!")
 		local count = #roomPlayers(room)
 		for _, player in roomPlayers(room) do
 			notify(
@@ -223,7 +225,9 @@ local function playRound(room: Room)
 				Color3.fromRGB(255, 220, 150)
 			)
 		end
-		local timeLeft = info.RoundTime
+		local timeFactor = math.max(Config.Pro.MinTimeFactor, 1 - Config.Pro.TimePerLevel * room.Level)
+		local timeLeft = math.floor(info.RoundTime * timeFactor)
+		local useMonster = info.Monster or room.Level > 0
 		local monsterSpawned = false
 		while timeLeft > 0 and not room.Finished do
 			if isEmpty(room) then
@@ -236,7 +240,7 @@ local function playRound(room: Room)
 			timeLeft -= 1
 			elapsed += 1
 			local monster = room.Monster
-			if monster then
+			if monster and useMonster then
 				monster.Progress = room.Books.Placed / room.Books.Total
 				if not monsterSpawned and elapsed >= Config.Monster.SpawnDelay then
 					monsterSpawned = true
@@ -259,13 +263,21 @@ local function playRound(room: Room)
 	room.State:SetAttribute("Results", results(room))
 	if room.Finished then
 		setState(room, "Won", "DE ZAAL IS SCHOON! Tijd: " .. formatTime(elapsed))
-		local reward = math.floor(Config.CoinsForWin * info.CoinMultiplier)
+		local reward = math.floor(Config.CoinsForWin * room.CoinMultiplier)
 		for _, player in roomPlayers(room) do
 			DataService.AddCoins(player, reward)
 			notify(player, "+" .. reward .. " munten!", Color3.fromRGB(255, 215, 0))
 			local profile = DataService.Get(player)
 			if profile then
 				profile.Wins += 1
+				-- Pro Mode: het volgende niveau van deze zaal gaat open
+				local unlocked = profile.Ascend[info.Id] or 0
+				local nextLevel = math.min(room.Level + 1, Config.Pro.MaxLevel)
+				if nextLevel > unlocked then
+					profile.Ascend[info.Id] = nextLevel
+					KeyService.Refresh(player)
+					notify(player, string.format("⭐ Pro %d van de %s is vrijgespeeld!", nextLevel, info.Name), Color3.fromRGB(255, 215, 0))
+				end
 				if not profile.BestTime or elapsed < profile.BestTime then
 					profile.BestTime = elapsed
 				end
@@ -328,18 +340,21 @@ local function createCopy(roomType: RoomType): Room
 		Finished = false,
 		RoundRunning = false,
 		TimeLeft = 0,
+		Level = 0,
+		CoinMultiplier = info.CoinMultiplier,
 	}
 
 	room.Books.OnAllPlaced = function()
 		room.Finished = true
 	end
 	room.Books.OnBookPlaced = function(player, count)
-		DataService.AddCoins(player, math.max(1, math.floor(count * Config.CoinsPerBook * info.CoinMultiplier + 0.5)))
+		DataService.AddCoins(player, math.max(1, math.floor(count * Config.CoinsPerBook * room.CoinMultiplier + 0.5)))
 		DataService.SetRoundBooks(player, DataService.GetRoundBooks(player) + count)
 		room.Contributions[player] = (room.Contributions[player] or 0) + count
 	end
 
-	if info.Monster then
+	-- Elke zaal krijgt een monster; in de Starterzaal komt ze alleen in Pro Mode tevoorschijn
+	do
 		local monster = MonsterService.new(info, library, function()
 			return roomPlayers(room)
 		end)
@@ -406,12 +421,28 @@ local function inZone(player: Player, zone: BasePart): boolean
 	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= zone.Size.X / 2 + 1 and math.abs(offset.Y) < zone.Size.Y
 end
 
+-- Zet het niveau (normaal of Pro) voor een nieuwe ronde
+local function setLevel(room: Room, level: number)
+	room.Level = level
+	room.CoinMultiplier = room.Info.CoinMultiplier * (1 + Config.Pro.CoinBonusPerLevel * level)
+	room.State:SetAttribute("Level", level)
+	if room.Monster then
+		room.Monster.SpeedMultiplier = 1 + Config.Pro.MonsterSpeedPerLevel * level
+	end
+end
+
 -- Stuurt een groep spelers samen naar binnen. Geeft false terug als alles bezet is.
-local function sendGroup(roomType: RoomType, group: { Player }): boolean
+local function sendGroup(roomType: RoomType, group: { Player }, level: number?): boolean
 	if #group == 0 then
 		return true
 	end
-	local room = copyWithFriend(roomType, group) or freeCopy(roomType)
+	local room = copyWithFriend(roomType, group)
+	if not room then
+		room = freeCopy(roomType)
+		if room then
+			setLevel(room, level or 0)
+		end
+	end
 	if not room then
 		for _, player in group do
 			notify(player, "Alle " .. roomType.Info.Name .. "s zijn bezet. Nog even wachten...", Color3.fromRGB(255, 200, 120))
@@ -445,13 +476,21 @@ local function launch(roomType: RoomType): boolean
 	return sendGroup(roomType, group)
 end
 
--- Gekozen in het menu: meteen naar binnen (bij een vriend als die al speelt)
-function RoomService.PlayNow(player: Player, typeId: string)
+-- Gekozen in het menu: meteen naar binnen (bij een vriend als die al speelt).
+-- `level` > 0 is Pro Mode; dat mag alleen als je dat niveau hebt vrijgespeeld.
+function RoomService.PlayNow(player: Player, typeId: string, level: number?)
 	local roomType = types[typeId]
 	if not roomType or playerRoom[player] then
 		return
 	end
-	sendGroup(roomType, { player })
+	local wanted = math.floor(tonumber(level) or 0)
+	local profile = DataService.Get(player)
+	local unlocked = if profile then profile.Ascend[typeId] or 0 else 0
+	if wanted > unlocked then
+		notify(player, "Win eerst de " .. roomType.Info.Name .. " om Pro Mode vrij te spelen!", Color3.fromRGB(255, 200, 120))
+		return
+	end
+	sendGroup(roomType, { player }, math.clamp(wanted, 0, Config.Pro.MaxLevel))
 end
 
 local function queueLoop()
@@ -523,9 +562,9 @@ function RoomService.Init(lobbyData)
 			RoomService.Leave(player, true)
 		end
 	end)
-	Remotes.Action.OnServerEvent:Connect(function(player, action, typeId)
+	Remotes.Action.OnServerEvent:Connect(function(player, action, typeId, level)
 		if action == "PlayRoom" and type(typeId) == "string" then
-			RoomService.PlayNow(player, typeId)
+			RoomService.PlayNow(player, typeId, if type(level) == "number" then level else 0)
 		end
 	end)
 
