@@ -2,7 +2,7 @@
 --   Inventory (server -> client): welke boeken je draagt
 --   Notify    (server -> client): korte melding in beeld
 --   Caught    (server -> client): je bent gepakt (jumpscare)
---   Action    (client -> server): "Drop", "Buy" (soort, id) of "Ability" (id)
+--   Action    (client -> server): "Drop", "Leave", "PlayRoom" (zaal), "Buy" (soort, id) of "Ability" (id)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")

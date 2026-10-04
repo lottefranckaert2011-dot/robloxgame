@@ -34,7 +34,9 @@ Zo werkt samen spelen in het spel:
 ## De hal en de zalen
 
 Je begint in de **hal**: een grote ruimte met boogramen, een paars gewelf met een kroonluchter en een reuzenboek op de vloer.
-Achterin staan drie deuren met een gloeiende ring ervoor. Stap in een ring (of druk op **E** bij de deur) om mee te doen met de volgende groep voor die zaal.
+Zodra je in de hal bent, verschijnt het menu **📖 Kies een zaal**. Klik bij een zaal op **▶ Spelen** en je gaat meteen naar binnen.
+Het menu krijg je terug met de knop rechtsboven.
+Wil je met vrienden samen in één groep? Sluit het menu en stap samen in de gloeiende ring voor een van de drie deuren achterin.
 
 | Zaal | Wat je krijgt |
 | --- | --- |

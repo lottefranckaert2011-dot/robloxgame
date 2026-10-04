@@ -35,6 +35,10 @@ local gui: ScreenGui
 local timerLabel: TextLabel
 local countersHolder: Frame
 local leaveButton: TextButton
+local chooseButton: TextButton
+local chooser: Frame
+local gameplayElements: { GuiObject } = {} -- alleen zichtbaar in een zaal
+local wasInRoom: boolean? = nil
 local placedLabel: TextLabel
 local carriedLabel: TextLabel
 local sectionsLeftLabel: TextLabel
@@ -555,7 +559,7 @@ local function buildBottomLeft()
 		Parent = gui,
 	})
 
-	local bar = make("Frame", {
+	local bar: Frame = make("Frame", {
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 14, 1, -104),
 		Size = UDim2.fromOffset(#Config.Magic * 94 - 10, 6),
@@ -564,6 +568,7 @@ local function buildBottomLeft()
 		Parent = gui,
 	})
 	corner(bar, 3)
+	table.insert(gameplayElements, bar)
 	staminaFill = make("Frame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.fromRGB(250, 214, 90),
@@ -623,6 +628,7 @@ local function buildBottomLeft()
 		corner(lock, 10)
 		cooldownOverlays[info.Id] = cooldown
 		lockIcons[info.Id] = lock
+		table.insert(gameplayElements, slot)
 		Hud.AbilitySlots[info.Id] = slot
 	end
 end
@@ -736,6 +742,131 @@ local function buildTopLeft()
 	end
 end
 
+-- Keuzemenu in de hal: kies een zaal en je gaat meteen naar binnen
+local function buildRoomChooser()
+	local count = #Config.Rooms
+	chooser = make("Frame", {
+		Name = "RoomChooser",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(40 + count * 210, 420),
+		BackgroundColor3 = NAVY,
+		Visible = false,
+		ZIndex = 25,
+		Parent = gui,
+	})
+	local uiScale = make("UIScale", { Parent = chooser })
+	local function fit()
+		local view = Workspace.CurrentCamera.ViewportSize
+		uiScale.Scale = math.clamp(math.min((view.X - 20) / (40 + count * 210), (view.Y - 20) / 420), 0.45, 1)
+	end
+	fit()
+	Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
+	corner(chooser, 16)
+	stroke(chooser, GOLD, 4)
+	outlined({
+		Position = UDim2.fromOffset(0, 10),
+		Size = UDim2.new(1, 0, 0, 50),
+		Font = SERIF,
+		TextSize = 46,
+		Text = "📖 Kies een zaal",
+		ZIndex = 26,
+		Parent = chooser,
+	})
+	local close = make("TextButton", {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -12, 0, 12),
+		Size = UDim2.fromOffset(42, 42),
+		BackgroundColor3 = CRIMSON,
+		Font = ROUND,
+		TextSize = 24,
+		TextColor3 = WHITE,
+		Text = "✕",
+		ZIndex = 27,
+		Parent = chooser,
+	})
+	corner(close, 21)
+	close.Activated:Connect(function()
+		chooser.Visible = false
+	end)
+
+	for i, room in Config.Rooms do
+		local card = make("Frame", {
+			Position = UDim2.fromOffset(20 + (i - 1) * 210, 72),
+			Size = UDim2.fromOffset(196, 280),
+			BackgroundColor3 = NAVY_DARK,
+			ZIndex = 26,
+			Parent = chooser,
+		})
+		corner(card, 12)
+		stroke(card, room.Color, 3)
+		local band = make("Frame", {
+			Size = UDim2.new(1, 0, 0, 12),
+			BackgroundColor3 = room.Color,
+			BorderSizePixel = 0,
+			ZIndex = 27,
+			Parent = card,
+		})
+		corner(band, 12)
+		outlined({
+			Position = UDim2.fromOffset(8, 20),
+			Size = UDim2.new(1, -16, 0, 60),
+			Font = SERIF,
+			TextSize = 30,
+			TextWrapped = true,
+			TextColor3 = room.Color,
+			Text = room.Name,
+			ZIndex = 27,
+			Parent = card,
+		})
+		local minutes = math.floor(room.RoundTime / 60)
+		make("TextLabel", {
+			Position = UDim2.fromOffset(12, 84),
+			Size = UDim2.new(1, -24, 0, 120),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.Gotham,
+			TextSize = 15,
+			TextWrapped = true,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextColor3 = Color3.fromRGB(215, 220, 240),
+			Text = string.format("%s\n\n⏱ %d minuten\n📚 %d boeken\n🪙 %s× munten", room.Description, minutes, Config.RoomTotalBooks(room), tostring(room.CoinMultiplier)),
+			ZIndex = 27,
+			Parent = card,
+		})
+		local play = make("TextButton", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -14),
+			Size = UDim2.new(1, -28, 0, 50),
+			BackgroundColor3 = Color3.fromRGB(46, 150, 80),
+			Font = ROUND,
+			TextSize = 24,
+			TextColor3 = WHITE,
+			Text = "▶ Spelen",
+			ZIndex = 27,
+			Parent = card,
+		})
+		corner(play, 10)
+		stroke(play, Color3.fromRGB(150, 240, 170), 2)
+		play.Activated:Connect(function()
+			chooser.Visible = false
+			Remotes.Action:FireServer("PlayRoom", room.Id)
+		end)
+	end
+	make("TextLabel", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		Size = UDim2.new(1, -40, 0, 40),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.Gotham,
+		TextSize = 15,
+		TextWrapped = true,
+		TextColor3 = Color3.fromRGB(200, 205, 230),
+		Text = "Met vrienden spelen? Sluit dit menu en stap samen in de ring voor een deur. Speelt een vriend al? Dan kom je bij hem of haar.",
+		ZIndex = 26,
+		Parent = chooser,
+	})
+end
+
 local function buildLeaveButton()
 	leaveButton = make("TextButton", {
 		Name = "Leave",
@@ -754,6 +885,25 @@ local function buildLeaveButton()
 	stroke(leaveButton, NAVY_EDGE, 2.5)
 	leaveButton.Activated:Connect(function()
 		Remotes.Action:FireServer("Leave")
+	end)
+
+	chooseButton = make("TextButton", {
+		Name = "Choose",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 70),
+		Size = UDim2.fromOffset(220, 46),
+		BackgroundColor3 = Color3.fromRGB(46, 150, 80),
+		Font = SERIF,
+		TextSize = 26,
+		TextColor3 = WHITE,
+		Text = "📖 Kies een zaal",
+		Visible = false,
+		Parent = gui,
+	})
+	corner(chooseButton, 8)
+	stroke(chooseButton, Color3.fromRGB(150, 240, 170), 2.5)
+	chooseButton.Activated:Connect(function()
+		chooser.Visible = not chooser.Visible
 	end)
 end
 
@@ -1082,14 +1232,29 @@ local function updateRound()
 		timerLabel.Visible = false
 		countersHolder.Visible = false
 		leaveButton.Visible = false
+		chooseButton.Visible = true
 		bigBanner.Visible = false
 		resultsLabel.Visible = false
+		for _, element in gameplayElements do
+			element.Visible = false
+		end
+		-- Net in de hal (bij de start of na een ronde): laat het keuzemenu zien
+		if wasInRoom ~= false then
+			chooser.Visible = true
+		end
+		wasInRoom = false
 		objectiveLabel.Text = "Kies een zaal!"
 		return
 	end
 	timerLabel.Visible = true
 	countersHolder.Visible = true
 	leaveButton.Visible = true
+	chooseButton.Visible = false
+	chooser.Visible = false
+	wasInRoom = true
+	for _, element in gameplayElements do
+		element.Visible = true
+	end
 
 	local state = roomState:GetAttribute("RoundState") or "Idle"
 	local timeLeft = roomState:GetAttribute("TimeLeft") or 0
@@ -1150,6 +1315,7 @@ function Hud.Init()
 	buildBottomLeft()
 	buildBottomRight()
 	buildTopLeft()
+	buildRoomChooser()
 	buildLeaveButton()
 	buildTouchButtons()
 	buildShopPanel()

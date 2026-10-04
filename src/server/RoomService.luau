@@ -399,14 +399,8 @@ local function inZone(player: Player, zone: BasePart): boolean
 	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= zone.Size.X / 2 + 1 and math.abs(offset.Y) < zone.Size.Y
 end
 
--- Iedereen die bij nul in de ring staat, gaat samen naar binnen
-local function launch(roomType: RoomType)
-	local group = {}
-	for _, player in roomType.Waiting do
-		if #group < Config.MaxGroupSize then
-			table.insert(group, player)
-		end
-	end
+-- Stuurt een groep spelers samen naar binnen. Geeft false terug als alles bezet is.
+local function sendGroup(roomType: RoomType, group: { Player }): boolean
 	if #group == 0 then
 		return true
 	end
@@ -431,6 +425,26 @@ local function launch(roomType: RoomType)
 		task.spawn(runRound, room)
 	end
 	return true
+end
+
+-- Iedereen die bij nul in de ring staat, gaat samen naar binnen
+local function launch(roomType: RoomType): boolean
+	local group = {}
+	for _, player in roomType.Waiting do
+		if #group < Config.MaxGroupSize then
+			table.insert(group, player)
+		end
+	end
+	return sendGroup(roomType, group)
+end
+
+-- Gekozen in het menu: meteen naar binnen (bij een vriend als die al speelt)
+function RoomService.PlayNow(player: Player, typeId: string)
+	local roomType = types[typeId]
+	if not roomType or playerRoom[player] then
+		return
+	end
+	sendGroup(roomType, { player })
 end
 
 local function queueLoop()
@@ -500,6 +514,11 @@ function RoomService.Init(lobbyData)
 			room.Books:Drop(player)
 		elseif action == "Leave" and room then
 			RoomService.Leave(player, true)
+		end
+	end)
+	Remotes.Action.OnServerEvent:Connect(function(player, action, typeId)
+		if action == "PlayRoom" and type(typeId) == "string" then
+			RoomService.PlayNow(player, typeId)
 		end
 	end)
 
