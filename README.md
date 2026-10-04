@@ -16,7 +16,9 @@ voordat de tijd op is. Maar **wees stil**: *The Librarian* sluipt door de gangen
 ## Afbeeldingen voor Roblox
 
 In de map [`assets/`](assets) staan een **icoon** (`icon.png`, 512 × 512) en een **thumbnail** (`thumbnail.png`, 1920 × 1080),
-gemaakt als 3D-render met Roblox-blokpoppetjes (zie [`tools/thumbnail`](tools/thumbnail)). Oudere getekende versies staan in `assets/alt/`.
+gemaakt als 3D-render in Roblox-stijl (zie [`tools/thumbnail`](tools/thumbnail)): een voor/na-thumbnail met een rommelige
+boekenberg en een opgeruimde regenboogkast, en een icoon met een geschrokken poppetje en een stapel boeken.
+Andere versies (nacht en getekend) staan in `assets/alt/`.
 Upload ze na het publiceren op [create.roblox.com](https://create.roblox.com) → je spel → *Places / Experience* → **Icon** en **Thumbnails**.
 
 ## Samen spelen

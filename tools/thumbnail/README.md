@@ -6,8 +6,9 @@ Een 3D-scène (three.js) met Roblox-achtige blokpoppetjes, die als afbeelding wo
 cd tools/thumbnail
 npm install
 python3 -m http.server 8765 --bind 127.0.0.1 &   # de scène moet via http geladen worden
-node render.js                                    # maakt icon.png (512x512) en thumb.png (1920x1080)
+node render_before_after.js                       # het huidige icoon + de voor/na-thumbnail (icon2.png, thumb2.png)
+node render.js                                    # de nachtversie (icon.png, thumb.png)
 ```
 
-Pas `scene.html` aan om poppetjes, kleuren, tekst of camera te veranderen.
+Pas `before_after.html` (huidige afbeeldingen) of `scene.html` (nachtversie) aan om poppetjes, kleuren, tekst of camera te veranderen.
 De lettertypes (Luckiest Guy en Creepster) vallen onder de SIL Open Font License.
