@@ -267,19 +267,19 @@ Config.Map = {
 
 -- Muziek (speelt in een lus en vloeit zacht over in de volgende)
 Config.Music = {
-	Lobby = "", -- in de hal: vrolijk en rustig
-	Library = "", -- in de Starterzaal en de Grote Zaal: rustige bibliotheekmuziek
-	Nightmare = "", -- in de Nachtmerriezaal: donker en eng
-	Chase = "", -- als het monster dichtbij is: spannend en snel
-	Countdown = "", -- de laatste minuut van een ronde: haastig
-	Win = "", -- als de zaal schoon is (speelt één keer)
-	Lose = "", -- als de tijd op is (speelt één keer)
+	Lobby = "78337557481833", -- in de hal: vrolijk en rustig
+	Library = "128255634516702", -- in de Starter Hall en de Grand Hall: rustige bibliotheekmuziek
+	Nightmare = "106675258903784", -- in de Nightmare Hall: donker en eng
+	Chase = "125696105099480", -- als het monster dichtbij is: spannend en snel
+	Countdown = "130137992067722", -- de laatste minuut van een ronde: haastig
+	Win = "116207799688630", -- als de zaal schoon is (speelt één keer)
+	Lose = "99659010137534", -- als de tijd op is (speelt één keer)
 }
 Config.MusicVolume = 0.35
 
 -- Geluidseffecten: alle effecten zitten samen in één bestand (assets/sounds/SoundEffects.ogg).
 -- Upload dat bestand en plak de ID hier; het spel speelt dan steeds het juiste stukje af.
-Config.SoundEffects = ""
+Config.SoundEffects = "98594908827209"
 
 -- Waar elk effect in SoundEffects.ogg staat (begin en eind in seconden)
 Config.SoundEffectRegions = {
