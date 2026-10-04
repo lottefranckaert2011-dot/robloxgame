@@ -341,7 +341,7 @@ local function buildMagicPanel()
 		TextSize = 26,
 		TextColor3 = GOLD,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = "🔑 Verborgen sleutels",
+		Text = "🔑 Sleutels (elke ronde opnieuw zoeken)",
 		ZIndex = 32,
 		Parent = list,
 	})

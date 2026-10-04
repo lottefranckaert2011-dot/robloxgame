@@ -139,6 +139,7 @@ function RoomService.Leave(player: Player, toLobby: boolean)
 	room.Players[player] = nil
 	playerRoom[player] = nil
 	player:SetAttribute("Room", nil)
+	KeyService.ResetKeys(player)
 	room.State:SetAttribute("Players", #roomPlayers(room))
 	if toLobby then
 		teleport(player, lobby.SpawnCFrame)
@@ -154,6 +155,7 @@ local function join(player: Player, room: Room)
 	room.Contributions[player] = room.Contributions[player] or 0
 	playerRoom[player] = room
 	player:SetAttribute("Room", room.Id)
+	KeyService.ResetKeys(player)
 	DataService.SetRoundBooks(player, 0)
 	room.Books:AddPlayer(player)
 	teleport(player, room.Library.SpawnCFrame)
@@ -191,6 +193,11 @@ local function playRound(room: Room)
 	end
 	room.State:SetAttribute("Results", "")
 	room.Books:Clear()
+	-- Nieuwe ronde: de sleutels liggen op nieuwe plekken en iedereen moet ze opnieuw zoeken
+	KeyService.Respawn(room.Library)
+	for player in room.Players do
+		KeyService.ResetKeys(player)
+	end
 
 	local aborted = false
 	for t = Config.StartCountdown, 1, -1 do

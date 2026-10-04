@@ -88,7 +88,8 @@ Op een telefoon of tablet tik je gewoon op de knoppen in beeld.
 
 ### Verborgen sleutels
 
-Ergens in de bibliotheek liggen vier gloeiende sleutels. Ze geven een upgrade die blijft:
+Ergens in elke zaal liggen vier gloeiende sleutels, elke ronde op een **andere plek**: achter een kast, op een tafel of in een hoekje.
+Hun upgrade geldt alleen voor die ronde. In de volgende ronde moet je ze dus opnieuw zoeken.
 
 | Sleutel | Upgrade |
 | --- | --- |

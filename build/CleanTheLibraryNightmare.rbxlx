@@ -1456,10 +1456,14 @@ local DataService = require(script.Parent.DataService)
 
 local KeyService = {}
 
+-- Sleutels die een speler deze ronde gevonden heeft. Ze tellen alleen voor die ronde:
+-- in elke nieuwe ronde (en in de hal) moet je ze opnieuw zoeken.
+local roundKeys: { [Player]: { [string]: boolean } } = {}
+
 -- Berekent alle upgrades (sleutels, winkel, magie, assistent) en zet ze als attributen
 local function applyUpgrades(player: Player)
 	local profile = DataService.Get(player)
-	local keys = if profile then profile.Keys else {}
+	local keys = roundKeys[player] or {}
 	local upgrades = if profile then profile.Upgrades else {}
 	for _, info in Config.Keys do
 		player:SetAttribute("Key_" .. info.Id, keys[info.Id] == true)
@@ -1530,17 +1534,18 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = p
 	prompt.Triggered:Connect(function(player)
-		local profile = DataService.Get(player)
-		if not profile then
-			return
+		local keys = roundKeys[player]
+		if not keys then
+			keys = {}
+			roundKeys[player] = keys
 		end
-		if profile.Keys[info.Id] then
+		if keys[info.Id] then
 			Remotes.Notify:FireClient(player, "Deze sleutel heb je al.", Color3.fromRGB(200, 200, 200))
 			return
 		end
-		profile.Keys[info.Id] = true
+		keys[info.Id] = true
 		applyUpgrades(player)
-		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s", info.Name, info.Description), info.Color)
+		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s (deze ronde)", info.Name, info.Description), info.Color)
 	end)
 
 	-- Langzaam ronddraaien en zweven
@@ -1557,20 +1562,41 @@ function KeyService.Refresh(player: Player)
 	applyUpgrades(player)
 end
 
--- Elke zaal heeft zijn eigen vier sleutels; je hoeft ze maar één keer te vinden
-function KeyService.AddLibrary(library)
+-- Legt de vier sleutels van een zaal op nieuwe, willekeurige plekken
+function KeyService.Respawn(library)
+	local old = library.Model:FindFirstChild("Keys")
+	if old then
+		old:Destroy()
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Keys"
 	folder.Parent = library.Model
+	local spots = table.clone(library.KeyCandidates)
 	for _, info in Config.Keys do
 		local spot = library.KeySpots[info.Id]
+		if #spots > 0 then
+			spot = table.remove(spots, math.random(1, #spots))
+		end
 		if spot then
 			buildKey(info, spot, folder)
 		end
 	end
 end
 
+function KeyService.AddLibrary(library)
+	KeyService.Respawn(library)
+end
+
+-- Vergeet de sleutels van deze speler (nieuwe ronde, of terug in de hal)
+function KeyService.ResetKeys(player: Player)
+	roundKeys[player] = {}
+	applyUpgrades(player)
+end
+
 function KeyService.Init()
+	Players.PlayerRemoving:Connect(function(player)
+		roundKeys[player] = nil
+	end)
 	DataService.OnLoaded = function(player)
 		applyUpgrades(player)
 	end
@@ -1647,6 +1673,7 @@ export type Library = {
 	Lockers: { LockerData },
 	Waypoints: { Vector3 },
 	KeySpots: { [string]: Vector3 },
+	KeyCandidates: { Vector3 }, -- plekken waar de sleutels elke ronde willekeurig komen te liggen
 	MonsterSpawn: Vector3,
 	RandomBookSpot: (self: Library) -> CFrame,
 	BookSpotNear: (self: Library, center: Vector3, radius: number, extra: Instance?) -> CFrame?,
@@ -2483,6 +2510,7 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 	end
 
 	-- Leestafels op de overgebleven plekken in het rooster
+	local tableSpots: { Vector3 } = {}
 	local furniture = Instance.new("Folder")
 	furniture.Name = "Furniture"
 	furniture.Parent = model
@@ -2492,12 +2520,16 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 			local col = (slot - 1) % #Map.GridX + 1
 			local row = math.floor((slot - 1) / #Map.GridX) + 1
 			local y = if floor == 1 then 0 else F2
-			buildTable(furniture, Vector3.new(Map.GridX[col], y, Map.GridZ[row]))
+			local spot = Vector3.new(Map.GridX[col], y, Map.GridZ[row])
+			buildTable(furniture, spot)
+			table.insert(tableSpots, spot)
 		end
 	end
 	-- Extra tafels in de hal bij de ingang
 	buildTable(furniture, Vector3.new(-60, 0, 62))
 	buildTable(furniture, Vector3.new(60, 0, 62))
+	table.insert(tableSpots, Vector3.new(-60, 0, 62))
+	table.insert(tableSpots, Vector3.new(60, 0, 62))
 	if room.Floors >= 2 then
 		buildTable(furniture, Vector3.new(-60, F2, 62))
 		buildTable(furniture, Vector3.new(40, F2, 62))
@@ -2593,8 +2625,18 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 	for id, spot in keySpots do
 		keySpots[id] = spot + offset
 	end
+	-- Mogelijke plekken voor de sleutels: de vaste verstopplekken, achter elke kast en op tafels
+	local keyCandidates = {}
+	for _, spot in keySpots do
+		table.insert(keyCandidates, spot)
+	end
 	for _, section in sections do
+		local back = section.Center + Vector3.new(math.random(-12, 12), 1.5, -Map.CaseDepth / 2 - 1.2)
+		table.insert(keyCandidates, back + offset)
 		section.Center += offset
+	end
+	for _, spot in tableSpots do
+		table.insert(keyCandidates, spot + Vector3.new(4, 4.8, 1.5) + offset)
 	end
 
 	-- Alles naar de plek van deze zaal schuiven en pas dan in de wereld zetten,
@@ -2613,6 +2655,7 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 		Lockers = lockers,
 		Waypoints = waypoints,
 		KeySpots = keySpots,
+		KeyCandidates = keyCandidates,
 		MonsterSpawn = Vector3.new(0, (if room.Floors >= 2 then F2 else 0) + 6, -70) + offset,
 	}
 
@@ -4036,6 +4079,7 @@ function RoomService.Leave(player: Player, toLobby: boolean)
 	room.Players[player] = nil
 	playerRoom[player] = nil
 	player:SetAttribute("Room", nil)
+	KeyService.ResetKeys(player)
 	room.State:SetAttribute("Players", #roomPlayers(room))
 	if toLobby then
 		teleport(player, lobby.SpawnCFrame)
@@ -4051,6 +4095,7 @@ local function join(player: Player, room: Room)
 	room.Contributions[player] = room.Contributions[player] or 0
 	playerRoom[player] = room
 	player:SetAttribute("Room", room.Id)
+	KeyService.ResetKeys(player)
 	DataService.SetRoundBooks(player, 0)
 	room.Books:AddPlayer(player)
 	teleport(player, room.Library.SpawnCFrame)
@@ -4088,6 +4133,11 @@ local function playRound(room: Room)
 	end
 	room.State:SetAttribute("Results", "")
 	room.Books:Clear()
+	-- Nieuwe ronde: de sleutels liggen op nieuwe plekken en iedereen moet ze opnieuw zoeken
+	KeyService.Respawn(room.Library)
+	for player in room.Players do
+		KeyService.ResetKeys(player)
+	end
 
 	local aborted = false
 	for t = Config.StartCountdown, 1, -1 do
@@ -5517,7 +5567,7 @@ local function buildMagicPanel()
 		TextSize = 26,
 		TextColor3 = GOLD,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Text = "🔑 Verborgen sleutels",
+		Text = "🔑 Sleutels (elke ronde opnieuw zoeken)",
 		ZIndex = 32,
 		Parent = list,
 	})

@@ -11,10 +11,14 @@ local DataService = require(script.Parent.DataService)
 
 local KeyService = {}
 
+-- Sleutels die een speler deze ronde gevonden heeft. Ze tellen alleen voor die ronde:
+-- in elke nieuwe ronde (en in de hal) moet je ze opnieuw zoeken.
+local roundKeys: { [Player]: { [string]: boolean } } = {}
+
 -- Berekent alle upgrades (sleutels, winkel, magie, assistent) en zet ze als attributen
 local function applyUpgrades(player: Player)
 	local profile = DataService.Get(player)
-	local keys = if profile then profile.Keys else {}
+	local keys = roundKeys[player] or {}
 	local upgrades = if profile then profile.Upgrades else {}
 	for _, info in Config.Keys do
 		player:SetAttribute("Key_" .. info.Id, keys[info.Id] == true)
@@ -85,17 +89,18 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = p
 	prompt.Triggered:Connect(function(player)
-		local profile = DataService.Get(player)
-		if not profile then
-			return
+		local keys = roundKeys[player]
+		if not keys then
+			keys = {}
+			roundKeys[player] = keys
 		end
-		if profile.Keys[info.Id] then
+		if keys[info.Id] then
 			Remotes.Notify:FireClient(player, "Deze sleutel heb je al.", Color3.fromRGB(200, 200, 200))
 			return
 		end
-		profile.Keys[info.Id] = true
+		keys[info.Id] = true
 		applyUpgrades(player)
-		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s", info.Name, info.Description), info.Color)
+		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s (deze ronde)", info.Name, info.Description), info.Color)
 	end)
 
 	-- Langzaam ronddraaien en zweven
@@ -112,20 +117,41 @@ function KeyService.Refresh(player: Player)
 	applyUpgrades(player)
 end
 
--- Elke zaal heeft zijn eigen vier sleutels; je hoeft ze maar één keer te vinden
-function KeyService.AddLibrary(library)
+-- Legt de vier sleutels van een zaal op nieuwe, willekeurige plekken
+function KeyService.Respawn(library)
+	local old = library.Model:FindFirstChild("Keys")
+	if old then
+		old:Destroy()
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Keys"
 	folder.Parent = library.Model
+	local spots = table.clone(library.KeyCandidates)
 	for _, info in Config.Keys do
 		local spot = library.KeySpots[info.Id]
+		if #spots > 0 then
+			spot = table.remove(spots, math.random(1, #spots))
+		end
 		if spot then
 			buildKey(info, spot, folder)
 		end
 	end
 end
 
+function KeyService.AddLibrary(library)
+	KeyService.Respawn(library)
+end
+
+-- Vergeet de sleutels van deze speler (nieuwe ronde, of terug in de hal)
+function KeyService.ResetKeys(player: Player)
+	roundKeys[player] = {}
+	applyUpgrades(player)
+end
+
 function KeyService.Init()
+	Players.PlayerRemoving:Connect(function(player)
+		roundKeys[player] = nil
+	end)
 	DataService.OnLoaded = function(player)
 		applyUpgrades(player)
 	end

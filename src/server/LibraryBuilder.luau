@@ -51,6 +51,7 @@ export type Library = {
 	Lockers: { LockerData },
 	Waypoints: { Vector3 },
 	KeySpots: { [string]: Vector3 },
+	KeyCandidates: { Vector3 }, -- plekken waar de sleutels elke ronde willekeurig komen te liggen
 	MonsterSpawn: Vector3,
 	RandomBookSpot: (self: Library) -> CFrame,
 	BookSpotNear: (self: Library, center: Vector3, radius: number, extra: Instance?) -> CFrame?,
@@ -887,6 +888,7 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 	end
 
 	-- Leestafels op de overgebleven plekken in het rooster
+	local tableSpots: { Vector3 } = {}
 	local furniture = Instance.new("Folder")
 	furniture.Name = "Furniture"
 	furniture.Parent = model
@@ -896,12 +898,16 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 			local col = (slot - 1) % #Map.GridX + 1
 			local row = math.floor((slot - 1) / #Map.GridX) + 1
 			local y = if floor == 1 then 0 else F2
-			buildTable(furniture, Vector3.new(Map.GridX[col], y, Map.GridZ[row]))
+			local spot = Vector3.new(Map.GridX[col], y, Map.GridZ[row])
+			buildTable(furniture, spot)
+			table.insert(tableSpots, spot)
 		end
 	end
 	-- Extra tafels in de hal bij de ingang
 	buildTable(furniture, Vector3.new(-60, 0, 62))
 	buildTable(furniture, Vector3.new(60, 0, 62))
+	table.insert(tableSpots, Vector3.new(-60, 0, 62))
+	table.insert(tableSpots, Vector3.new(60, 0, 62))
 	if room.Floors >= 2 then
 		buildTable(furniture, Vector3.new(-60, F2, 62))
 		buildTable(furniture, Vector3.new(40, F2, 62))
@@ -997,8 +1003,18 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 	for id, spot in keySpots do
 		keySpots[id] = spot + offset
 	end
+	-- Mogelijke plekken voor de sleutels: de vaste verstopplekken, achter elke kast en op tafels
+	local keyCandidates = {}
+	for _, spot in keySpots do
+		table.insert(keyCandidates, spot)
+	end
 	for _, section in sections do
+		local back = section.Center + Vector3.new(math.random(-12, 12), 1.5, -Map.CaseDepth / 2 - 1.2)
+		table.insert(keyCandidates, back + offset)
 		section.Center += offset
+	end
+	for _, spot in tableSpots do
+		table.insert(keyCandidates, spot + Vector3.new(4, 4.8, 1.5) + offset)
 	end
 
 	-- Alles naar de plek van deze zaal schuiven en pas dan in de wereld zetten,
@@ -1017,6 +1033,7 @@ function LibraryBuilder.Build(room: Config.RoomInfo, parent: Instance, offset: V
 		Lockers = lockers,
 		Waypoints = waypoints,
 		KeySpots = keySpots,
+		KeyCandidates = keyCandidates,
 		MonsterSpawn = Vector3.new(0, (if room.Floors >= 2 then F2 else 0) + 6, -70) + offset,
 	}
 
