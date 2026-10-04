@@ -15,6 +15,7 @@ local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
 local Effects = {}
+Effects.Danger = 0 -- 0..1, hoe dicht het monster bij is (de muziek gebruikt dit ook)
 
 local Hud
 local flickerLights: { { part: BasePart, light: Light } } = {}
@@ -215,6 +216,7 @@ function Effects.Init(hud)
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local monsterRoot = findMonster(roomModel())
 		if not root or not monsterRoot then
+			Effects.Danger = 0
 			Hud.SetDanger(0)
 			return
 		end
@@ -222,6 +224,7 @@ function Effects.Init(hud)
 		local distance = offset.Magnitude
 		local sameFloor = math.abs(offset.Y) < 14
 		local danger = if sameFloor then math.clamp(1 - (distance - 8) / 45, 0, 1) else 0
+		Effects.Danger = danger
 		-- Hartslag
 		local pulse = 0.75 + 0.25 * math.sin(os.clock() * (6 + danger * 8))
 		Hud.SetDanger(danger * pulse)

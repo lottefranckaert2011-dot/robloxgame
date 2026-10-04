@@ -18,7 +18,7 @@ local player = Players.LocalPlayer
 local Hud = {}
 Hud.Buttons = {} :: { [string]: GuiButton }
 Hud.AbilitySlots = {} :: { [string]: GuiButton }
-Hud.Settings = { Shake = true, Danger = true }
+Hud.Settings = { Shake = true, Danger = true, Music = true }
 
 local NAVY = Color3.fromRGB(24, 36, 70)
 local NAVY_DARK = Color3.fromRGB(16, 24, 50)
@@ -411,6 +411,7 @@ end
 local function buildSettingsPanel()
 	local list = buildPanel("Settings", "Instellingen", NAVY_EDGE)
 	local options = {
+		{ "Music", "🎵", "Muziek", "Muziek en hartslag aan of uit" },
 		{ "Shake", "📳", "Schermschudden", "Het beeld trilt als het monster dichtbij is" },
 		{ "Danger", "🟥", "Gevarenrand", "Rode rand als het monster dichtbij is" },
 	}

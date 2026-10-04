@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 local DataService = require(script.Parent.DataService)
 
 local KeyService = {}
@@ -100,6 +101,7 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 		end
 		keys[info.Id] = true
 		applyUpgrades(player)
+		Sounds.Play("Key", p, 0.8)
 		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s (deze ronde)", info.Name, info.Description), info.Color)
 	end)
 

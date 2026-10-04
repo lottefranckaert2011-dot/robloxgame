@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 
 export type BookData = {
 	Id: number,
@@ -45,21 +46,8 @@ local BASE_SIZE = Vector3.new(1.4, 0.35, 1.9)
 local PAGES_COLOR = Color3.fromRGB(246, 236, 210)
 local nextId = 0
 
-local function playSound(id: string, parent: Instance)
-	local sound = Instance.new("Sound")
-	sound.SoundId = id
-	sound.Volume = 0.6
-	sound.RollOffMaxDistance = 60
-	sound.Parent = parent
-	sound:Play()
-	sound.Ended:Once(function()
-		sound:Destroy()
-	end)
-	task.delay(5, function()
-		if sound.Parent then
-			sound:Destroy()
-		end
-	end)
+local function playSound(name: string, parent: Instance)
+	Sounds.Play(name, parent)
 end
 
 local function notify(player: Player, text: string, color: Color3?)
@@ -325,7 +313,7 @@ function BookService.PickUp(self: BookService, player: Player, bookPart: BasePar
 	end
 	table.insert(list, book)
 	if player.Character and not silent then
-		playSound(Config.SoundIds.Pickup, player.Character)
+		playSound("Pickup", player.Character)
 	end
 	bookPart:Destroy()
 	if not silent then
@@ -416,7 +404,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 	if placedNow == 0 then
 		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
-			playSound(Config.SoundIds.Wrong, character)
+			playSound("Wrong", character)
 			local root = getRoot(player)
 			if root and self.OnMistake then
 				self.OnMistake(player, root.Position)
@@ -425,7 +413,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 		return
 	end
 	if character then
-		playSound(Config.SoundIds.Place, character)
+		playSound("Place", character)
 	end
 	self:Changed(player)
 end
@@ -459,7 +447,7 @@ function BookService.Assemble(self: BookService, player: Player, radius: number)
 		end
 	end
 	if got > 0 then
-		playSound(Config.SoundIds.Pickup, root)
+		playSound("Pickup", root)
 		self:Changed(player)
 	end
 	return got
@@ -483,7 +471,7 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 	end
 	if total > 0 then
 		if root then
-			playSound(Config.SoundIds.Place, root)
+			playSound("Place", root)
 			-- Laat de boeken zichtbaar van je handen naar hun kast vliegen
 			for i, book in flying do
 				local section = self.Library.Sections[book.Code]

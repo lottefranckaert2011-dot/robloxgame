@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 
 local M = Config.Monster
 
@@ -332,6 +333,9 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 			target = player
 			sawHide = false
 			Remotes.Notify:FireClient(player, "Ze heeft je gezien! RENNEN!", Color3.fromRGB(255, 40, 40))
+			if head then
+				Sounds.Play("Shush", head, 1)
+			end
 		end
 		lastSeen = os.clock()
 	end
@@ -363,11 +367,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		if self.OnCatch then
 			self.OnCatch(player)
 		end
-		local sound = Instance.new("Sound")
-		sound.SoundId = Config.SoundIds.Caught
-		sound.Volume = 1
-		sound.Parent = hrp
-		sound:Play()
+		Sounds.Play("Caught", hrp, 1)
 		task.delay(0.6, function()
 			if hum.Parent then
 				hum.Health = 0

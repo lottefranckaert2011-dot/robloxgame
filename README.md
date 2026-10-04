@@ -98,6 +98,32 @@ Hun upgrade geldt alleen voor die ronde. In de volgende ronde moet je ze dus opn
 | Azuurblauwe Ster | +3 boeken dragen |
 | Smaragdgroene Klaver | Je sprint veel sneller |
 
+## Muziek en geluid toevoegen
+
+De muziek en geluiden staan allemaal bovenin het stuk **MUZIEK EN GELUID** in [`src/shared/Config.luau`](src/shared/Config.luau).
+Alles wat leeg is (`""`), blijft stil. Zo vul je ze in:
+
+1. Open in Roblox Studio de **Toolbox** (*View → Toolbox*) en kies het tabblad **Audio** (of zoek op [create.roblox.com/store/audio](https://create.roblox.com/store/audio)).
+2. Zoek een nummer, bijvoorbeeld *calm library*, *mystery*, *horror chase* of *victory*. Luister het eerst even af.
+3. Klik met de rechtermuisknop op het geluid → **Copy Asset ID**.
+4. Plak het getal in `Config.luau`, bijvoorbeeld `Library = "1234567890",`.
+
+| Plek in `Config.Music` | Wanneer het speelt |
+| --- | --- |
+| `Lobby` | in de hal |
+| `Library` | in de Starterzaal en de Grote Zaal |
+| `Nightmare` | in de Nachtmerriezaal |
+| `Chase` | als het monster dichtbij is |
+| `Countdown` | in de laatste minuut van een ronde |
+| `Win` / `Lose` | als de zaal schoon is / als de tijd op is |
+
+Bij `Config.SoundIds` kun je ook geluidseffecten invullen: `Key` (sleutel gevonden), `Shush` (het monster ziet je),
+`Heartbeat` (hartslag als het monster dichtbij is), `Portal` (naar binnen gaan) en `Coins` (munten).
+Met `Config.MusicVolume` zet je de muziek harder of zachter. Spelers kunnen de muziek uitzetten bij **Instellingen (Z)**.
+
+> Gebruik geluiden van Roblox zelf of geluiden die openbaar zijn gemaakt. Andere geluiden blijven stil in jouw spel;
+> dan zie je een melding in het Output-venster.
+
 ## Aanpassen
 
 Bijna alles staat in [`src/shared/Config.luau`](src/shared/Config.luau): speeltijd, aantal boeken per sectie,

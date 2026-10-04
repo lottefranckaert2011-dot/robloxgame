@@ -245,13 +245,50 @@ Config.Map = {
 	CaseDepth = 3,
 }
 
-Config.SoundIds = {
-	-- Ingebouwde Roblox-geluiden. Vervang ze gerust door eigen sound IDs.
-	Pickup = "rbxasset://sounds/clickfast.wav",
-	Place = "rbxasset://sounds/electronicpingshort.wav",
-	Wrong = "rbxasset://sounds/button.wav",
-	Caught = "rbxasset://sounds/uuhhh.mp3",
+----------------------------------------------------------------------------
+-- MUZIEK EN GELUID
+-- Plak hier de ID's van geluiden uit de Creator Store (Toolbox -> Audio).
+-- Je mag alleen het getal invullen (bijv. 1234567890) of "rbxassetid://1234567890".
+-- Laat je iets leeg (""), dan is dat geluid gewoon stil.
+----------------------------------------------------------------------------
+
+-- Muziek (speelt in een lus en vloeit zacht over in de volgende)
+Config.Music = {
+	Lobby = "", -- in de hal: vrolijk en rustig
+	Library = "", -- in de Starterzaal en de Grote Zaal: rustige bibliotheekmuziek
+	Nightmare = "", -- in de Nachtmerriezaal: donker en eng
+	Chase = "", -- als het monster dichtbij is: spannend en snel
+	Countdown = "", -- de laatste minuut van een ronde: haastig
+	Win = "", -- als de zaal schoon is (speelt één keer)
+	Lose = "", -- als de tijd op is (speelt één keer)
 }
+Config.MusicVolume = 0.35
+
+-- Geluidseffecten
+Config.SoundIds = {
+	Pickup = "rbxasset://sounds/clickfast.wav", -- boek oppakken
+	Place = "rbxasset://sounds/electronicpingshort.wav", -- boek in de goede kast
+	Wrong = "rbxasset://sounds/button.wav", -- verkeerde kast
+	Caught = "rbxasset://sounds/uuhhh.mp3", -- gepakt door het monster
+	Key = "", -- sleutel gevonden
+	Shush = "", -- het monster ziet je ("SSSHHH!")
+	Heartbeat = "", -- hartslag als het monster dichtbij is (speelt in een lus)
+	Portal = "", -- door een deur naar een zaal
+	Coins = "", -- munten verdiend / iets gekocht
+}
+
+-- Maakt van een getal of tekst een bruikbare SoundId (of nil als het leeg is)
+function Config.AssetId(value: any): string?
+	if type(value) == "number" then
+		return "rbxassetid://" .. math.floor(value)
+	elseif type(value) == "string" and value ~= "" then
+		if string.match(value, "^%d+$") then
+			return "rbxassetid://" .. value
+		end
+		return value
+	end
+	return nil
+end
 
 -- 31 kastsecties: 1A–1N op de begane grond, 2A–2Q op de eerste verdieping
 Config.Sections = {

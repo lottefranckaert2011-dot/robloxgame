@@ -263,13 +263,50 @@ Config.Map = {
 	CaseDepth = 3,
 }
 
-Config.SoundIds = {
-	-- Ingebouwde Roblox-geluiden. Vervang ze gerust door eigen sound IDs.
-	Pickup = "rbxasset://sounds/clickfast.wav",
-	Place = "rbxasset://sounds/electronicpingshort.wav",
-	Wrong = "rbxasset://sounds/button.wav",
-	Caught = "rbxasset://sounds/uuhhh.mp3",
+----------------------------------------------------------------------------
+-- MUZIEK EN GELUID
+-- Plak hier de ID's van geluiden uit de Creator Store (Toolbox -> Audio).
+-- Je mag alleen het getal invullen (bijv. 1234567890) of "rbxassetid://1234567890".
+-- Laat je iets leeg (""), dan is dat geluid gewoon stil.
+----------------------------------------------------------------------------
+
+-- Muziek (speelt in een lus en vloeit zacht over in de volgende)
+Config.Music = {
+	Lobby = "", -- in de hal: vrolijk en rustig
+	Library = "", -- in de Starterzaal en de Grote Zaal: rustige bibliotheekmuziek
+	Nightmare = "", -- in de Nachtmerriezaal: donker en eng
+	Chase = "", -- als het monster dichtbij is: spannend en snel
+	Countdown = "", -- de laatste minuut van een ronde: haastig
+	Win = "", -- als de zaal schoon is (speelt één keer)
+	Lose = "", -- als de tijd op is (speelt één keer)
 }
+Config.MusicVolume = 0.35
+
+-- Geluidseffecten
+Config.SoundIds = {
+	Pickup = "rbxasset://sounds/clickfast.wav", -- boek oppakken
+	Place = "rbxasset://sounds/electronicpingshort.wav", -- boek in de goede kast
+	Wrong = "rbxasset://sounds/button.wav", -- verkeerde kast
+	Caught = "rbxasset://sounds/uuhhh.mp3", -- gepakt door het monster
+	Key = "", -- sleutel gevonden
+	Shush = "", -- het monster ziet je ("SSSHHH!")
+	Heartbeat = "", -- hartslag als het monster dichtbij is (speelt in een lus)
+	Portal = "", -- door een deur naar een zaal
+	Coins = "", -- munten verdiend / iets gekocht
+}
+
+-- Maakt van een getal of tekst een bruikbare SoundId (of nil als het leeg is)
+function Config.AssetId(value: any): string?
+	if type(value) == "number" then
+		return "rbxassetid://" .. math.floor(value)
+	elseif type(value) == "string" and value ~= "" then
+		if string.match(value, "^%d+$") then
+			return "rbxassetid://" .. value
+		end
+		return value
+	end
+	return nil
+end
 
 -- 31 kastsecties: 1A–1N op de begane grond, 2A–2Q op de eerste verdieping
 Config.Sections = {
@@ -442,13 +479,50 @@ return {
 ]]></string>
         </Properties>
       </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
+          <string name="Name">Sounds</string>
+          <string name="Source"><![CDATA[-- Speelt een kort geluid af op een plek (server of client).
+-- Lege ID's in Config.SoundIds worden overgeslagen.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+
+local Sounds = {}
+
+function Sounds.Play(name: string, parent: Instance, volume: number?)
+	local soundId = Config.AssetId((Config.SoundIds :: any)[name])
+	if not soundId then
+		return
+	end
+	local sound = Instance.new("Sound")
+	sound.SoundId = soundId
+	sound.Volume = volume or 0.6
+	sound.RollOffMaxDistance = 80
+	sound.Parent = parent
+	sound:Play()
+	sound.Ended:Once(function()
+		sound:Destroy()
+	end)
+	task.delay(10, function()
+		if sound.Parent then
+			sound:Destroy()
+		end
+	end)
+end
+
+return Sounds
+]]></string>
+        </Properties>
+      </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="5">
+  <Item class="ServerScriptService" referent="6">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="6">
+    <Item class="Script" referent="7">
       <Properties>
         <string name="Name">Server</string>
         <token name="RunContext">0</token>
@@ -515,7 +589,7 @@ ShopService.Init()
 print(Config.GameName .. " is gestart!")
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="7">
+      <Item class="ModuleScript" referent="8">
         <Properties>
           <string name="Name">BookService</string>
           <string name="Source"><![CDATA[-- Boeken in één zaal: verspreiden, oppakken, dragen, laten vallen en in de juiste kast zetten.
@@ -526,6 +600,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 
 export type BookData = {
 	Id: number,
@@ -565,21 +640,8 @@ local BASE_SIZE = Vector3.new(1.4, 0.35, 1.9)
 local PAGES_COLOR = Color3.fromRGB(246, 236, 210)
 local nextId = 0
 
-local function playSound(id: string, parent: Instance)
-	local sound = Instance.new("Sound")
-	sound.SoundId = id
-	sound.Volume = 0.6
-	sound.RollOffMaxDistance = 60
-	sound.Parent = parent
-	sound:Play()
-	sound.Ended:Once(function()
-		sound:Destroy()
-	end)
-	task.delay(5, function()
-		if sound.Parent then
-			sound:Destroy()
-		end
-	end)
+local function playSound(name: string, parent: Instance)
+	Sounds.Play(name, parent)
 end
 
 local function notify(player: Player, text: string, color: Color3?)
@@ -845,7 +907,7 @@ function BookService.PickUp(self: BookService, player: Player, bookPart: BasePar
 	end
 	table.insert(list, book)
 	if player.Character and not silent then
-		playSound(Config.SoundIds.Pickup, player.Character)
+		playSound("Pickup", player.Character)
 	end
 	bookPart:Destroy()
 	if not silent then
@@ -936,7 +998,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 	if placedNow == 0 then
 		notify(player, string.format("Verkeerde kast! Dit is %s %s.", section.Code, section.Name), Color3.fromRGB(255, 90, 90))
 		if character then
-			playSound(Config.SoundIds.Wrong, character)
+			playSound("Wrong", character)
 			local root = getRoot(player)
 			if root and self.OnMistake then
 				self.OnMistake(player, root.Position)
@@ -945,7 +1007,7 @@ function BookService.Place(self: BookService, player: Player, code: string)
 		return
 	end
 	if character then
-		playSound(Config.SoundIds.Place, character)
+		playSound("Place", character)
 	end
 	self:Changed(player)
 end
@@ -979,7 +1041,7 @@ function BookService.Assemble(self: BookService, player: Player, radius: number)
 		end
 	end
 	if got > 0 then
-		playSound(Config.SoundIds.Pickup, root)
+		playSound("Pickup", root)
 		self:Changed(player)
 	end
 	return got
@@ -1003,7 +1065,7 @@ function BookService.AutoShelf(self: BookService, player: Player): number
 	end
 	if total > 0 then
 		if root then
-			playSound(Config.SoundIds.Place, root)
+			playSound("Place", root)
 			-- Laat de boeken zichtbaar van je handen naar hun kast vliegen
 			for i, book in flying do
 				local section = self.Library.Sections[book.Code]
@@ -1187,7 +1249,7 @@ return BookService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="8">
+      <Item class="ModuleScript" referent="9">
         <Properties>
           <string name="Name">DataService</string>
           <string name="Source"><![CDATA[-- Slaat munten, gevonden sleutels en je snelste tijd op met DataStoreService.
@@ -1376,7 +1438,7 @@ return DataService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="9">
+      <Item class="ModuleScript" referent="10">
         <Properties>
           <string name="Name">HideService</string>
           <string name="Source"><![CDATA[-- Verstoppen in kluisjes. Het monster ziet je daar niet...
@@ -1477,7 +1539,7 @@ return HideService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="10">
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">KeyService</string>
           <string name="Source"><![CDATA[-- De vier verborgen sleutels. Elke sleutel geeft een permanente upgrade
@@ -1489,6 +1551,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 local DataService = require(script.Parent.DataService)
 
 local KeyService = {}
@@ -1582,6 +1645,7 @@ local function buildKey(info: Config.KeyInfo, position: Vector3, parent: Instanc
 		end
 		keys[info.Id] = true
 		applyUpgrades(player)
+		Sounds.Play("Key", p, 0.8)
 		Remotes.Notify:FireClient(player, string.format("🔑 %s gevonden! %s (deze ronde)", info.Name, info.Description), info.Color)
 	end)
 
@@ -1654,7 +1718,7 @@ return KeyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">LibraryBuilder</string>
           <string name="Source"><![CDATA[-- Bouwt de hele bibliotheek met code, in de stijl van het origineel:
@@ -2765,7 +2829,7 @@ return LibraryBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="13">
         <Properties>
           <string name="Name">LobbyBuilder</string>
           <string name="Source"><![CDATA[-- Bouwt de hal waar je begint: blauwe muren met boogramen, een paars gewelf
@@ -3369,7 +3433,7 @@ return LobbyBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">MonsterService</string>
           <string name="Source"><![CDATA[-- "De Bibliothecaresse": het monster dat door de donkere bibliotheek sluipt.
@@ -3381,6 +3445,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 
 local M = Config.Monster
 
@@ -3706,6 +3771,9 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 			target = player
 			sawHide = false
 			Remotes.Notify:FireClient(player, "Ze heeft je gezien! RENNEN!", Color3.fromRGB(255, 40, 40))
+			if head then
+				Sounds.Play("Shush", head, 1)
+			end
 		end
 		lastSeen = os.clock()
 	end
@@ -3737,11 +3805,7 @@ function MonsterService.new(room: Config.RoomInfo, library, getPlayers: () -> { 
 		if self.OnCatch then
 			self.OnCatch(player)
 		end
-		local sound = Instance.new("Sound")
-		sound.SoundId = Config.SoundIds.Caught
-		sound.Volume = 1
-		sound.Parent = hrp
-		sound:Play()
+		Sounds.Play("Caught", hrp, 1)
 		task.delay(0.6, function()
 			if hum.Parent then
 				hum.Health = 0
@@ -3972,7 +4036,7 @@ return MonsterService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">RoomService</string>
           <string name="Source"><![CDATA[-- Zalen en samen spelen.
@@ -4560,7 +4624,7 @@ return RoomService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">ShopService</string>
           <string name="Source"><![CDATA[-- Winkel, magie en de assistent: kopen met munten en de vaardigheden uitvoeren.
@@ -4725,16 +4789,16 @@ return ShopService
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="16">
+  <Item class="StarterPlayer" referent="17">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <bool name="EnableMouseLockOption">false</bool>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="17">
+    <Item class="StarterPlayerScripts" referent="18">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="18">
+      <Item class="LocalScript" referent="19">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[-- Startpunt van de client.
@@ -4742,13 +4806,15 @@ return ShopService
 local Hud = require(script.Hud)
 local Controls = require(script.Controls)
 local Effects = require(script.Effects)
+local Music = require(script.Music)
 
 Hud.Init()
 Controls.Init(Hud)
-Effects.Init(Hud)
+task.spawn(Effects.Init, Hud) -- wacht op de zalen
+Music.Init(Hud, Effects)
 ]]></string>
         </Properties>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">Controls</string>
             <string name="Source"><![CDATA[-- Besturing: sprinten met uithoudingsvermogen, boeken laten vallen,
@@ -5045,7 +5111,7 @@ return Controls
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- Effecten: donkere sfeer + zaklamp in de Nachtmerriezaal, flikkerende lampjes,
@@ -5065,6 +5131,7 @@ local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
 local Effects = {}
+Effects.Danger = 0 -- 0..1, hoe dicht het monster bij is (de muziek gebruikt dit ook)
 
 local Hud
 local flickerLights: { { part: BasePart, light: Light } } = {}
@@ -5265,6 +5332,7 @@ function Effects.Init(hud)
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local monsterRoot = findMonster(roomModel())
 		if not root or not monsterRoot then
+			Effects.Danger = 0
 			Hud.SetDanger(0)
 			return
 		end
@@ -5272,6 +5340,7 @@ function Effects.Init(hud)
 		local distance = offset.Magnitude
 		local sameFloor = math.abs(offset.Y) < 14
 		local danger = if sameFloor then math.clamp(1 - (distance - 8) / 45, 0, 1) else 0
+		Effects.Danger = danger
 		-- Hartslag
 		local pulse = 0.75 + 0.25 * math.sin(os.clock() * (6 + danger * 8))
 		Hud.SetDanger(danger * pulse)
@@ -5290,7 +5359,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Hud</string>
             <string name="Source"><![CDATA[-- Het scherm, in de stijl van het origineel:
@@ -5313,7 +5382,7 @@ local player = Players.LocalPlayer
 local Hud = {}
 Hud.Buttons = {} :: { [string]: GuiButton }
 Hud.AbilitySlots = {} :: { [string]: GuiButton }
-Hud.Settings = { Shake = true, Danger = true }
+Hud.Settings = { Shake = true, Danger = true, Music = true }
 
 local NAVY = Color3.fromRGB(24, 36, 70)
 local NAVY_DARK = Color3.fromRGB(16, 24, 50)
@@ -5706,6 +5775,7 @@ end
 local function buildSettingsPanel()
 	local list = buildPanel("Settings", "Instellingen", NAVY_EDGE)
 	local options = {
+		{ "Music", "🎵", "Muziek", "Muziek en hartslag aan of uit" },
 		{ "Shake", "📳", "Schermschudden", "Het beeld trilt als het monster dichtbij is" },
 		{ "Danger", "🟥", "Gevarenrand", "Rode rand als het monster dichtbij is" },
 	}
@@ -6647,10 +6717,152 @@ return Hud
 ]]></string>
           </Properties>
         </Item>
+        <Item class="ModuleScript" referent="23">
+          <Properties>
+            <string name="Name">Music</string>
+            <string name="Source"><![CDATA[-- Muziek die vanzelf past bij waar je bent en wat er gebeurt:
+-- hal, bibliotheek, nachtmerrie, achtervolging, laatste minuut, gewonnen of verloren.
+-- Nummers vloeien zacht in elkaar over. De ID's staan in Config.Music.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
+
+local player = Players.LocalPlayer
+
+local Music = {}
+
+local tracks: { [string]: Sound } = {}
+local current: string? = nil
+local heartbeat: Sound? = nil
+
+local function makeSound(name: string, soundId: string, looped: boolean): Sound
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.SoundId = soundId
+	sound.Looped = looped
+	sound.Volume = 0
+	sound.Parent = SoundService
+	return sound
+end
+
+local function roomState(): Instance?
+	local id = player:GetAttribute("Room")
+	local folder = ReplicatedStorage:FindFirstChild("RoomState")
+	if type(id) ~= "string" or not folder then
+		return nil
+	end
+	return folder:FindFirstChild(id)
+end
+
+-- Welke nummers passen nu, van best naar minder goed (het eerste dat bestaat wint)
+local function wishes(danger: number): { string }
+	local state = roomState()
+	if not state then
+		return { "Lobby", "Library" }
+	end
+	local status = state:GetAttribute("RoundState")
+	if status == "Won" then
+		return { "Win" }
+	elseif status == "Lost" then
+		return { "Lose" }
+	end
+	local base = if state:GetAttribute("Dark") then { "Nightmare", "Library" } else { "Library", "Lobby" }
+	local list = {}
+	if danger > 0.35 then
+		table.insert(list, "Chase")
+	end
+	if status == "Playing" and (state:GetAttribute("TimeLeft") or math.huge) <= 60 then
+		table.insert(list, "Countdown")
+	end
+	for _, name in base do
+		table.insert(list, name)
+	end
+	return list
+end
+
+function Music.Init(hud, effects)
+	for name, value in Config.Music do
+		local soundId = Config.AssetId(value)
+		if soundId then
+			tracks[name] = makeSound("Music_" .. name, soundId, name ~= "Win" and name ~= "Lose")
+		end
+	end
+	local heartbeatId = Config.AssetId(Config.SoundIds.Heartbeat)
+	if heartbeatId then
+		heartbeat = makeSound("Heartbeat", heartbeatId, true)
+	end
+
+	-- Kleine geluidjes voor jezelf: munten erbij en door een deur stappen
+	local lastCoins = player:GetAttribute("Coins") or 0
+	player:GetAttributeChangedSignal("Coins"):Connect(function()
+		local coins = player:GetAttribute("Coins") or 0
+		if coins ~= lastCoins then
+			Sounds.Play("Coins", SoundService, 0.5)
+		end
+		lastCoins = coins
+	end)
+	player:GetAttributeChangedSignal("Room"):Connect(function()
+		if player:GetAttribute("Room") then
+			Sounds.Play("Portal", SoundService, 0.7)
+		end
+	end)
+
+	RunService.Heartbeat:Connect(function(dt)
+		local enabled = hud.Settings.Music
+		local danger = effects.Danger or 0
+
+		local target: string? = nil
+		for _, name in wishes(danger) do
+			if tracks[name] then
+				target = name
+				break
+			end
+		end
+		if target ~= current then
+			current = target
+			local sound = if target then tracks[target] else nil
+			if sound and not sound.IsPlaying then
+				sound.TimePosition = 0
+				sound:Play()
+			end
+		end
+
+		-- Zacht in- en uitfaden
+		local fade = math.min(1, dt * 1.5)
+		for name, sound in tracks do
+			local goal = if enabled and name == current then Config.MusicVolume else 0
+			sound.Volume += (goal - sound.Volume) * fade
+			if goal == 0 and sound.IsPlaying and sound.Volume < 0.01 then
+				sound:Stop()
+			end
+		end
+
+		if heartbeat then
+			local goal = if enabled then math.clamp(danger, 0, 1) * 0.9 else 0
+			heartbeat.Volume += (goal - heartbeat.Volume) * fade
+			heartbeat.PlaybackSpeed = 1 + danger * 0.6
+			if goal > 0.02 and not heartbeat.IsPlaying then
+				heartbeat:Play()
+			elseif goal <= 0.02 and heartbeat.IsPlaying and heartbeat.Volume < 0.01 then
+				heartbeat:Stop()
+			end
+		end
+	end)
+end
+
+return Music
+]]></string>
+          </Properties>
+        </Item>
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="22">
+  <Item class="Workspace" referent="24">
     <Properties>
       <string name="Name">Workspace</string>
       <bool name="NeedsPivotMigration">false</bool>
