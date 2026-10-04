@@ -70,9 +70,12 @@ function Music.Init(hud, effects)
 			tracks[name] = makeSound("Music_" .. name, soundId, name ~= "Win" and name ~= "Lose")
 		end
 	end
-	local heartbeatId = Config.AssetId(Config.SoundIds.Heartbeat)
-	if heartbeatId then
-		heartbeat = makeSound("Heartbeat", heartbeatId, true)
+	local beat = Sounds.Create("Heartbeat", true)
+	if beat then
+		beat.Name = "Heartbeat"
+		beat.Volume = 0
+		beat.Parent = SoundService
+		heartbeat = beat
 	end
 
 	-- Kleine geluidjes voor jezelf: munten erbij en door een deur stappen

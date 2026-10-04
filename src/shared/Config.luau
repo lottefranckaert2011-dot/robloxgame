@@ -259,7 +259,8 @@ Config.Map = {
 
 ----------------------------------------------------------------------------
 -- MUZIEK EN GELUID
--- Plak hier de ID's van geluiden uit de Creator Store (Toolbox -> Audio).
+-- In de map assets/sounds staan zelfgemaakte muziek en geluiden: upload ze naar Roblox
+-- (zie de README) en plak de ID's hieronder. Je mag ook geluiden uit de Creator Store gebruiken.
 -- Je mag alleen het getal invullen (bijv. 1234567890) of "rbxassetid://1234567890".
 -- Laat je iets leeg (""), dan is dat geluid gewoon stil.
 ----------------------------------------------------------------------------
@@ -276,17 +277,42 @@ Config.Music = {
 }
 Config.MusicVolume = 0.35
 
--- Geluidseffecten
+-- Geluidseffecten: alle effecten zitten samen in één bestand (assets/sounds/SoundEffects.ogg).
+-- Upload dat bestand en plak de ID hier; het spel speelt dan steeds het juiste stukje af.
+Config.SoundEffects = ""
+
+-- Waar elk effect in SoundEffects.ogg staat (begin en eind in seconden)
+Config.SoundEffectRegions = {
+	Pickup = { 0, 0.35 }, -- boek oppakken
+	Place = { 2, 2.9 }, -- boek in de goede kast
+	Wrong = { 4, 4.45 }, -- verkeerde kast
+	Key = { 6, 7.2 }, -- sleutel gevonden
+	Shush = { 8, 9.3 }, -- het monster ziet je ("SSSHHH!")
+	Heartbeat = { 10, 10.9 }, -- hartslag als het monster dichtbij is (speelt in een lus)
+	Portal = { 12, 13 }, -- naar binnen gaan
+	Coins = { 14, 14.6 }, -- munten verdiend / iets gekocht
+	Caught = { 16, 17.6 }, -- gepakt door het monster
+}
+
+-- Wil je één effect vervangen door een ander geluid? Zet dan hier een eigen ID neer (dat gaat voor).
 Config.SoundIds = {
-	Pickup = "rbxasset://sounds/clickfast.wav", -- boek oppakken
-	Place = "rbxasset://sounds/electronicpingshort.wav", -- boek in de goede kast
-	Wrong = "rbxasset://sounds/button.wav", -- verkeerde kast
-	Caught = "rbxasset://sounds/uuhhh.mp3", -- gepakt door het monster
-	Key = "", -- sleutel gevonden
-	Shush = "", -- het monster ziet je ("SSSHHH!")
-	Heartbeat = "", -- hartslag als het monster dichtbij is (speelt in een lus)
-	Portal = "", -- door een deur naar een zaal
-	Coins = "", -- munten verdiend / iets gekocht
+	Pickup = "",
+	Place = "",
+	Wrong = "",
+	Key = "",
+	Shush = "",
+	Heartbeat = "",
+	Portal = "",
+	Coins = "",
+	Caught = "",
+}
+
+-- Oude ingebouwde Roblox-geluidjes, alleen als er nog niets is ingevuld
+Config.BuiltInSounds = {
+	Pickup = "rbxasset://sounds/clickfast.wav",
+	Place = "rbxasset://sounds/electronicpingshort.wav",
+	Wrong = "rbxasset://sounds/button.wav",
+	Caught = "rbxasset://sounds/uuhhh.mp3",
 }
 
 -- Maakt van een getal of tekst een bruikbare SoundId (of nil als het leeg is)

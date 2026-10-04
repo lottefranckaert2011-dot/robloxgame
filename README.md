@@ -122,29 +122,37 @@ Hun upgrade geldt alleen voor die ronde. In de volgende ronde moet je ze dus opn
 
 ## Muziek en geluid toevoegen
 
-De muziek en geluiden staan allemaal bovenin het stuk **MUZIEK EN GELUID** in [`src/shared/Config.luau`](src/shared/Config.luau).
-Alles wat leeg is (`""`), blijft stil. Zo vul je ze in:
+In de map [`assets/sounds/`](assets/sounds) staan **zelfgemaakte muziek en geluiden** voor het spel:
 
-1. Open in Roblox Studio de **Toolbox** (*View → Toolbox*) en kies het tabblad **Audio** (of zoek op [create.roblox.com/store/audio](https://create.roblox.com/store/audio)).
-2. Zoek een nummer, bijvoorbeeld *calm library*, *mystery*, *horror chase* of *victory*. Luister het eerst even af.
-3. Klik met de rechtermuisknop op het geluid → **Copy Asset ID**.
-4. Plak het getal in `Config.luau`, bijvoorbeeld `Library = "1234567890",`.
+| Bestand | Wat het is | Plak de ID in `Config.luau` bij |
+| --- | --- | --- |
+| `Lobby.ogg` | vrolijke speeldoosmuziek voor de hal | `Config.Music.Lobby` |
+| `Library.ogg` | rustige harp in de Starter Hall en Grand Hall | `Config.Music.Library` |
+| `Nightmare.ogg` | donkere brom, wind en enge klokjes | `Config.Music.Nightmare` |
+| `Chase.ogg` | snelle, spannende muziek als het monster dichtbij is | `Config.Music.Chase` |
+| `Countdown.ogg` | tikkende klok voor de laatste minuut | `Config.Music.Countdown` |
+| `Win.ogg` | fanfare als de zaal schoon is | `Config.Music.Win` |
+| `Lose.ogg` | "wah-wah" als de tijd op is | `Config.Music.Lose` |
+| `SoundEffects.ogg` | álle geluidseffecten in één bestand (oppakken, kast, fout, sleutel, SSSHHH, hartslag, portaal, munten, gepakt) | `Config.SoundEffects` |
 
-| Plek in `Config.Music` | Wanneer het speelt |
-| --- | --- |
-| `Lobby` | in de hal |
-| `Library` | in de Starter Hall en de Grand Hall |
-| `Nightmare` | in de Nightmare Hall |
-| `Chase` | als het monster dichtbij is |
-| `Countdown` | in de laatste minuut van een ronde |
-| `Win` / `Lose` | als de zaal schoon is / als de tijd op is |
+Roblox speelt alleen geluiden die op Roblox staan, dus je moet ze eerst **uploaden** (8 bestanden):
 
-Bij `Config.SoundIds` kun je ook geluidseffecten invullen: `Key` (sleutel gevonden), `Shush` (het monster ziet je),
-`Heartbeat` (hartslag als het monster dichtbij is), `Portal` (naar binnen gaan) en `Coins` (munten).
+1. Ga naar [create.roblox.com](https://create.roblox.com) → **Creations** → **Development Items** → **Audio**
+   (of in Studio: *View → Asset Manager* → **Bulk Import**).
+2. Klik op **Upload Asset**, kies een `.ogg`-bestand uit `assets/sounds` en geef het een naam.
+3. Wacht tot het is goedgekeurd (meestal een paar minuten). Klik dan op de drie puntjes → **Copy Asset ID**.
+4. Open `src/shared/Config.luau` (in Studio: *ReplicatedStorage → Shared → Config*) en plak de ID op de juiste plek,
+   bijvoorbeeld `Lobby = "1234567890",` en `Config.SoundEffects = "1234567890"`.
+
+Zolang een plek leeg is (`""`), blijft dat geluid stil. Voor oppakken, terugzetten, fout en gepakt probeert het spel dan
+de oude ingebouwde Roblox-geluidjes.
+
+> Roblox heeft een limiet op hoeveel geluiden je per maand mag uploaden. Daarom zitten alle effecten samen in
+> `SoundEffects.ogg`: het spel speelt steeds het juiste stukje af (zie `Config.SoundEffectRegions`).
+> Wil je één effect vervangen door een ander geluid, bijvoorbeeld uit de Toolbox, dan zet je die ID bij `Config.SoundIds`.
+
 Met `Config.MusicVolume` zet je de muziek harder of zachter. Spelers kunnen de muziek uitzetten bij **Settings (Z)**.
-
-> Gebruik geluiden van Roblox zelf of geluiden die openbaar zijn gemaakt. Andere geluiden blijven stil in jouw spel;
-> dan zie je een melding in het Output-venster.
+De geluiden zijn gemaakt met [`tools/make_sounds.py`](tools/make_sounds.py); daarmee kun je ze opnieuw maken of aanpassen.
 
 ## Aanpassen
 
