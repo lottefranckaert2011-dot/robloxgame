@@ -13,6 +13,11 @@ voordat de tijd op is. Maar **wees stil**: *The Librarian* sluipt door de gangen
 2. Kies *File → Open from File…* en open `build/TheLibraryNeverSleeps.rbxlx`.
 3. Druk op **Play** (F5).
 
+## Afbeeldingen voor Roblox
+
+In de map [`assets/`](assets) staan een **icoon** (`icon.png`, 512 × 512) en een **thumbnail** (`thumbnail.png`, 1920 × 1080).
+Upload ze na het publiceren op [create.roblox.com](https://create.roblox.com) → je spel → *Places / Experience* → **Icon** en **Thumbnails**.
+
 ## Samen spelen
 
 - **In Studio testen met meerdere spelers:** ga naar het tabblad *Test*, kies bij *Clients and Servers* het aantal spelers
